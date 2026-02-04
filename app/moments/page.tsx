@@ -1,0 +1,107 @@
+import fs from "fs";
+import path from "path";
+import exifr from "exifr";
+import { withBasePath } from "@/lib/utils";
+import MomentsClient, { MomentItem } from "./moments-client";
+
+const imageExtensions = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"]);
+const videoExtensions = new Set([".mp4", ".webm", ".mov"]);
+
+function toTitleFromFilename(filename: string): string {
+  const base = filename.replace(path.extname(filename), "");
+  const cleaned = base.replace(/[_-]+/g, " ").trim();
+  return cleaned.length > 0
+    ? cleaned.replace(/\b\w/g, (c) => c.toUpperCase())
+    : "Captured Moment";
+}
+
+function getMediaFiles(dir: string): string[] {
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir);
+}
+
+async function getImageDate(fullPath: string, stats: fs.Stats): Promise<Date> {
+  try {
+    const exif = await exifr.parse(fullPath, {
+      pick: ["DateTimeOriginal", "CreateDate", "ModifyDate"],
+    });
+    const exifDate =
+      (exif?.DateTimeOriginal as Date | undefined) ||
+      (exif?.CreateDate as Date | undefined) ||
+      (exif?.ModifyDate as Date | undefined);
+
+    if (exifDate instanceof Date && !Number.isNaN(exifDate.getTime())) {
+      return exifDate;
+    }
+  } catch {
+    // Ignore EXIF read errors and fall back to file timestamps
+  }
+
+  return stats.birthtime || stats.mtime;
+}
+
+async function buildDynamicMoments(): Promise<MomentItem[]> {
+  const publicDir = path.join(process.cwd(), "public");
+  const imageDir = path.join(publicDir, "assets", "together", "img");
+  const videoDir = path.join(publicDir, "assets", "together", "video");
+
+  const images = getMediaFiles(imageDir).filter((file) =>
+    imageExtensions.has(path.extname(file).toLowerCase()),
+  );
+  const videos = getMediaFiles(videoDir).filter((file) =>
+    videoExtensions.has(path.extname(file).toLowerCase()),
+  );
+
+  const items: Array<Omit<MomentItem, "id"> & { sortTime: number }> = [];
+
+  const imageItems = await Promise.all(
+    images.map(async (file) => {
+      const fullPath = path.join(imageDir, file);
+      const stats = fs.statSync(fullPath);
+      const date = await getImageDate(fullPath, stats);
+      const time = date.getTime();
+
+      return {
+        title: toTitleFromFilename(file),
+        date: "",
+        location: "Memory Lane",
+        type: "image" as const,
+        src: withBasePath(`/assets/together/img/${file}`),
+        description: "A frozen fragment of time, kept safe forever.",
+        tags: ["Memory", "Photo"],
+        sortTime: time,
+      };
+    }),
+  );
+
+  items.push(...imageItems);
+
+  for (const file of videos) {
+    const fullPath = path.join(videoDir, file);
+    const stats = fs.statSync(fullPath);
+    const time = (stats.birthtime || stats.mtime).getTime();
+
+    items.push({
+      title: toTitleFromFilename(file),
+      date: "",
+      location: "Memory Lane",
+      type: "video",
+      src: withBasePath(`/assets/together/video/${file}`),
+      description: "A moving memory, preserved forever.",
+      tags: ["Memory", "Video"],
+      sortTime: time,
+    });
+  }
+
+  items.sort((a, b) => a.sortTime - b.sortTime);
+
+  return items.map((item, index) => {
+    const { sortTime, ...rest } = item;
+    return { id: index + 1, ...rest };
+  });
+}
+
+export default async function Moments() {
+  const moments = await buildDynamicMoments();
+  return <MomentsClient moments={moments} />;
+}

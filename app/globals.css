@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: var(--font-space), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
+  --color-card: var(--card-bg);
+  --color-grid: var(--grid-color);
+}
+
+:root {
+  --background: #fafafa;       /* Off-White Cloud */
+  --foreground: #1a1a1a;     /* Deep Charcoal */
+  --accent: #7c3aed;   /* Royal Purple */
+  --card-bg: #ffffff;          /* White cards */
+  --grid-color: rgba(0, 0, 0, 0.08); /* Subtle borders */
+}
+
+.dark {
+  --background: #050505;
+  --foreground: #f0f0f0;
+  --accent: #a855f7;  /* Light Purple for dark mode */
+  --card-bg: rgba(25, 25, 25, 0.5); /* Slightly lighter dark card */
+  --grid-color: rgba(255, 255, 255, 0.05);
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.5s ease, color 0.5s ease;
+}
+
+/* Retro Grid */
+.retro-grid {
+  background-size: 40px 40px;
+  background-image:
+    linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+  mask-image: radial-gradient(circle at center, black 50%, transparent 100%);
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+}
+
+.dark .retro-grid {
+  /* Inherits var(--grid-color) */
+}
+
+/* Text Effects */
+.text-glow {
+  text-shadow: 0 0 5px rgba(124, 58, 237, 0.2), 0 0 10px rgba(124, 58, 237, 0.1);
+}
+
+.text-glow-accent {
+  text-shadow: 0 0 15px rgba(124, 58, 237, 0.4), 0 0 30px rgba(124, 58, 237, 0.2);
+}
+
+.dark .text-glow {
+  text-shadow: 0 0 5px rgba(168, 85, 247, 0.5), 0 0 10px rgba(168, 85, 247, 0.3);
+}
+
+.dark .text-glow-accent {
+  text-shadow: 0 0 10px rgba(168, 85, 247, 0.6), 0 0 20px rgba(168, 85, 247, 0.4);
+}
+
+
+/* Scanlines */
+.scanlines::before {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  /* Light Mode Scanlines - Extremely subtle */
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.02) 50%), linear-gradient(90deg, rgba(0, 0, 0, 0.01), rgba(0, 0, 0, 0.01), rgba(0, 0, 0, 0.01));
+  z-index: 50;
+  background-size: 100% 2px, 3px 100%;
+  pointer-events: none;
+  opacity: 0.06;
+}
+
+.dark .scanlines::before {
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+  opacity: 0.6;
+}
