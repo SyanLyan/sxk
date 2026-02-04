@@ -42,7 +42,7 @@ function getMediaForCollection(folderName: string, isVideo = false): string[] {
     const publicDir = path.join(process.cwd(), 'public');
     // Switch base path between 'img' and 'video' based on type
     const assetType = isVideo ? 'video' : 'img';
-    const relativePath = path.join('src', 'assets', 'her', assetType, folderName);
+    const relativePath = path.join('Her', assetType, folderName);
     const fullPath = path.join(publicDir, relativePath);
 
     if (!fs.existsSync(fullPath)) {

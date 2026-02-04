@@ -42,8 +42,8 @@ async function getImageDate(fullPath: string, stats: fs.Stats): Promise<Date> {
 
 async function buildDynamicMoments(): Promise<MomentItem[]> {
   const publicDir = path.join(process.cwd(), "public");
-  const imageDir = path.join(publicDir, "together", "img");
-  const videoDir = path.join(publicDir, "together", "video");
+  const imageDir = path.join(publicDir, "Together", "img");
+  const videoDir = path.join(publicDir, "Together", "video");
 
   const images = getMediaFiles(imageDir).filter((file) =>
     imageExtensions.has(path.extname(file).toLowerCase()),
@@ -66,7 +66,7 @@ async function buildDynamicMoments(): Promise<MomentItem[]> {
         date: "",
         location: "Memory Lane",
         type: "image" as const,
-        src: withBasePath(`/together/img/${file}`),
+        src: withBasePath(`/Together/img/${file}`),
         description: "A frozen fragment of time, kept safe forever.",
         tags: ["Memory", "Photo"],
         sortTime: time,
@@ -86,7 +86,7 @@ async function buildDynamicMoments(): Promise<MomentItem[]> {
       date: "",
       location: "Memory Lane",
       type: "video",
-      src: withBasePath(`/together/video/${file}`),
+      src: withBasePath(`/Together/video/${file}`),
       description: "A moving memory, preserved forever.",
       tags: ["Memory", "Video"],
       sortTime: time,
