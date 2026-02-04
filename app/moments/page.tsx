@@ -42,8 +42,8 @@ async function getImageDate(fullPath: string, stats: fs.Stats): Promise<Date> {
 
 async function buildDynamicMoments(): Promise<MomentItem[]> {
   const publicDir = path.join(process.cwd(), "public");
-  const imageDir = path.join(publicDir, "assets", "together", "img");
-  const videoDir = path.join(publicDir, "assets", "together", "video");
+  const imageDir = path.join(publicDir, "together", "img");
+  const videoDir = path.join(publicDir, "together", "video");
 
   const images = getMediaFiles(imageDir).filter((file) =>
     imageExtensions.has(path.extname(file).toLowerCase()),

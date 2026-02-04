@@ -9,7 +9,7 @@ const mockEvents: TimelineEvent[] = [
     location: "New Beginnings",
     description: "The moment our universes collided. It wasn't just a meeting; it was the start of a story written in the stars. The world seemed to pause, if only for a second.",
     tags: ["First Meet", "Destiny"],
-    image: withBasePath("/assets/timeline/img/1000005351.jpeg")
+    image: withBasePath("/timeline/img/1000005351.jpeg")
   },
   {
     year: "2025",
