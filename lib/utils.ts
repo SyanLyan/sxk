@@ -6,7 +6,6 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function withBasePath(src: string) {
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-  if (!basePath) return src;
-  return src.startsWith("/") ? `${basePath}${src}` : `${basePath}/${src}`;
+  return src;
 }
+

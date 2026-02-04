@@ -18,7 +18,7 @@ const mockEvents: TimelineEvent[] = [
     location: "Thanlyin Bridge",
     description: "Wind in our hair, sun on our faces. We explored the old town, finding beauty in the ruins and in each other's company.",
     tags: ["Travel", "Memory"],
-    image: withBasePath("/assets/timeline/img/1000005438.jpeg")
+    image: withBasePath("/timeline/img/1000005438.jpeg")
   },
   {
     year: "2025",
@@ -27,7 +27,7 @@ const mockEvents: TimelineEvent[] = [
     location: "Home",
     description: "Realizing that the best adventures are often the quiet ones—shared silence, coffee, and understanding without words.",
     tags: ["Intimacy", "Growth"],
-    image: withBasePath("/assets/timeline/img/1000011919.jpeg")
+    image: withBasePath("/timeline/img/1000011919.jpeg")
   },
   {
     year: "2026",
@@ -36,7 +36,7 @@ const mockEvents: TimelineEvent[] = [
     location: "The Future",
     description: "Every day adds a new brick to the castle we are building together. The best is yet to come.",
     tags: ["Future", "Dreams"],
-    image: withBasePath("/assets/timeline/img/1000011608.jpeg")
+    image: withBasePath("/timeline/img/1000011608.jpeg")
   },
 ];
 
