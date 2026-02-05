@@ -24,7 +24,7 @@ const mockEvents: TimelineEvent[] = [
     year: "2026",
     title: "Casual Shopping Date",
     date: "January 18",
-    location: "The City",
+    location: "SPIRITS",
     description: "A fun day out shopping and walking around together. Just enjoying a casual date and each other's company.",
     tags: ["Date", "Shopping"],
     image: withBasePath("/Timeline/img/1000011919.jpeg")
