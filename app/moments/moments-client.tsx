@@ -327,11 +327,11 @@ export default function MomentsClient({ moments, collections }: { moments: Momen
       {/* Collection Modal */}
       <AnimatePresence>
           {selectedCollection && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-white dark:bg-black">
-                  <button 
+              <div className="fixed inset-0 z-[10050] flex items-center justify-center bg-white dark:bg-black">
+                    <button 
                       onClick={() => setSelectedCollection(null)}
-                      className="absolute top-4 right-4 md:right-8 z-50 p-2 text-gray-900 dark:text-white"
-                  >
+                      className="absolute top-4 left-4 md:top-6 md:left-6 z-50 p-2 text-gray-900 dark:text-white"
+                    >
                       <X size={32} />
                   </button>
                   
