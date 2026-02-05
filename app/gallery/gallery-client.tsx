@@ -11,6 +11,7 @@ import {
   X,
   Heart,
   ScanLine,
+  Ban,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -262,7 +263,10 @@ export default function GalleryClient({ initialCollections }: GalleryClientProps
                   autoFocus
                   placeholder="ENTER PASSCODE"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (error) setError(false);
+                  }}
                   aria-invalid={error}
                   aria-describedby="gallery-passcode-hint gallery-passcode-error"
                   animate={
@@ -270,26 +274,48 @@ export default function GalleryClient({ initialCollections }: GalleryClientProps
                       ? { x: [-10, 10, -10, 10, 0], color: "#ef4444" }
                       : { color: "var(--foreground)" }
                   }
-                  className="w-full bg-transparent border-b border-gray-300 dark:border-white/20 py-4 text-center text-2xl font-mono tracking-[0.5em] focus:outline-none focus:border-purple-600 dark:focus:border-purple-400 transition-all placeholder:text-gray-400 dark:placeholder:text-white/20 placeholder:text-sm placeholder:tracking-widest text-gray-900 dark:text-white"
+                  className={cn(
+                    "w-full bg-transparent border-b py-4 text-center text-2xl font-mono tracking-[0.5em] focus:outline-none transition-all placeholder:text-gray-400 dark:placeholder:text-white/20 placeholder:text-sm placeholder:tracking-widest text-gray-900 dark:text-white",
+                    error 
+                      ? "border-red-500/50" 
+                      : "border-gray-300 dark:border-white/20 focus:border-purple-600 dark:focus:border-purple-400"
+                  )}
                 />
-                <div className="absolute bottom-0 left-0 w-full h-px bg-purple-600 dark:bg-purple-400 scale-x-0 group-focus-within:scale-x-100 transition-transform duration-700 ease-out shadow-[0_0_10px_rgba(124,58,237,0.5)]" />
-
-                <div className="mt-4 space-y-2">
-                  <p
-                    id="gallery-passcode-hint"
-                    className="text-[10px] font-mono tracking-[0.3em] uppercase text-gray-500 dark:text-gray-400"
-                  >
-                    Hint: Anniversary Date?
-                  </p>
-                  <p
-                    id="gallery-passcode-error"
+                <div 
                     className={cn(
-                      "text-xs font-mono text-red-500 transition-opacity",
-                      error ? "opacity-100" : "opacity-0",
+                        "absolute bottom-0 left-0 w-full h-px scale-x-0 group-focus-within:scale-x-100 transition-transform duration-700 ease-out shadow-[0_0_10px_rgba(124,58,237,0.5)]",
+                        error ? "bg-red-500" : "bg-purple-600 dark:bg-purple-400"
+                    )} 
+                />
+
+                <div className="mt-8 h-10 flex items-center justify-center">
+                  <AnimatePresence mode="wait">
+                    {error ? (
+                       <motion.div
+                          key="error"
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 10 }}
+                          className="flex items-center gap-2 px-3 py-1.5 rounded bg-red-500/10 border border-red-500/20 text-red-500"
+                       >
+                          <Ban size={12} />
+                          <span className="text-[10px] font-mono tracking-[0.2em] font-bold uppercase">
+                            Access Denied
+                          </span>
+                       </motion.div>
+                    ) : (
+                       <motion.p
+                          key="hint"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          id="gallery-passcode-hint"
+                          className="text-[10px] font-mono tracking-[0.3em] uppercase text-gray-500 dark:text-gray-400"
+                        >
+                          Hint: Anniversary Date?
+                        </motion.p>
                     )}
-                  >
-                    Incorrect passcode. Try again.
-                  </p>
+                  </AnimatePresence>
                 </div>
 
                 <AnimatePresence>
@@ -388,11 +414,7 @@ export default function GalleryClient({ initialCollections }: GalleryClientProps
                         muted
                         loop
                         playsInline
-                        onMouseEnter={(e) => e.currentTarget.play()}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.pause();
-                          e.currentTarget.currentTime = 0;
-                        }}
+                        autoPlay
                       />
                     ) : (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -476,14 +498,10 @@ export default function GalleryClient({ initialCollections }: GalleryClientProps
                         activeCollection === "beach" &&
                           "grayscale contrast-125 brightness-90 sepia-[0.2] group-hover:grayscale-0 group-hover:contrast-100 group-hover:brightness-100 group-hover:sepia-0",
                       )}
+                      autoPlay
                       muted
                       loop
                       playsInline
-                      onMouseEnter={(e) => e.currentTarget.play()}
-                      onMouseLeave={(e) => {
-                          e.currentTarget.pause();
-                          e.currentTarget.currentTime = 0;
-                      }}
                    />
                 ) : (
                     <img
