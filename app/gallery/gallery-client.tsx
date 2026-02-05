@@ -195,7 +195,7 @@ export default function GalleryClient({ initialCollections }: GalleryClientProps
             >
               <ScanLine size={48} className="text-purple-600 dark:text-purple-500" />
             </motion.div>
-            <div className="font-mono text-xl tracking-[0.3em] text-purple-600 dark:text-purple-400">
+            <div className="font-mono text-sm md:text-xl tracking-[0.3em] text-purple-600 dark:text-purple-400">
               DECRYPTING ARCHIVES...
             </div>
             <div className="w-64 h-1 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
@@ -370,7 +370,10 @@ export default function GalleryClient({ initialCollections }: GalleryClientProps
                     type: "spring",
                     stiffness: 300,
                   }}
-                  onClick={() => setActiveCollection(collection.id)}
+                  onClick={() => {
+                    setActiveCollection(collection.id);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
                   className="group relative aspect-[4/5] md:aspect-square rounded-2xl overflow-hidden cursor-pointer border border-gray-200/50 dark:border-white/10"
                 >
                   {/* Shimmer Effect */}

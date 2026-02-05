@@ -13,20 +13,20 @@ const mockEvents: TimelineEvent[] = [
   },
   {
     year: "2025",
-    title: "Adventures in Thanlyin",
-    date: "March 15",
-    location: "Thanlyin Bridge",
-    description: "Wind in our hair, sun on our faces. We explored the old town, finding beauty in the ruins and in each other's company.",
-    tags: ["Travel", "Memory"],
+    title: "Office Selfie",
+    date: "June 12",
+    location: "The Office",
+    description: "A candid moment captured at work. Even in the office, we find reasons to smile together.",
+    tags: ["Work", "Together"],
     image: withBasePath("/Timeline/img/1000005438.jpeg")
   },
   {
-    year: "2025",
-    title: "Quiet Moments",
-    date: "August 20",
-    location: "Home",
-    description: "Realizing that the best adventures are often the quiet ones—shared silence, coffee, and understanding without words.",
-    tags: ["Intimacy", "Growth"],
+    year: "2026",
+    title: "Casual Shopping Date",
+    date: "January 18",
+    location: "The City",
+    description: "A fun day out shopping and walking around together. Just enjoying a casual date and each other's company.",
+    tags: ["Date", "Shopping"],
     image: withBasePath("/Timeline/img/1000011919.jpeg")
   },
   {

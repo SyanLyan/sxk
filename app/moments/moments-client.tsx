@@ -20,6 +20,9 @@ import {
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
+// Helper to check for video files
+const isVideo = (src: string) => /\.(mp4|webm|mov)$/i.test(src);
+
 export type MomentItem = {
   id: number;
   title: string;
@@ -31,12 +34,23 @@ export type MomentItem = {
   tags: string[];
 };
 
-export default function MomentsClient({ moments }: { moments: MomentItem[] }) {
+export type CollectionItem = {
+    id: string;
+    title: string;
+    description: string;
+    cover: string;
+    images: string[];
+};
+
+export default function MomentsClient({ moments, collections }: { moments: MomentItem[], collections: CollectionItem[] }) {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [activeLayoutId, setActiveLayoutId] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
-  if (moments.length === 0) {
+  // Collection State
+  const [selectedCollection, setSelectedCollection] = useState<CollectionItem | null>(null);
+
+  if (moments.length === 0 && collections.length === 0) {
     return (
       <div className="min-h-screen w-full pt-28 pb-32 px-4 md:px-12 relative z-10 flex flex-col items-center">
         <div className="text-center max-w-xl">
@@ -75,7 +89,7 @@ export default function MomentsClient({ moments }: { moments: MomentItem[] }) {
 
   return (
     <div className="min-h-screen w-full pt-16 pb-12 px-4 md:px-12 relative z-10 flex flex-col items-center">
-      <div className="w-full max-w-7xl mx-auto h-screen flex flex-col justify-center">
+      <div className="w-full max-w-7xl mx-auto md:min-h-screen flex flex-col justify-start md:justify-center">
         {/* Editorial Header */}
         <div className="text-center mb-10 max-w-2xl mx-auto relative">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-purple-500/10 dark:bg-purple-500/20 blur-[80px] rounded-full pointer-events-none" />
@@ -178,6 +192,49 @@ export default function MomentsClient({ moments }: { moments: MomentItem[] }) {
           })}
         </div>
         </div>
+
+        {/* Collections Section */}
+        {collections.length > 0 && (
+            <div className="w-full max-w-7xl mx-auto mt-24 md:mt-32 pb-32">
+                <div className="text-center mb-12">
+                     <h3 className="text-2xl md:text-3xl font-serif italic text-gray-900 dark:text-white mb-2">
+                        Shared Chapters
+                     </h3>
+                     <div className="h-0.5 w-12 bg-purple-500 mx-auto" />
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    {collections.map((collection) => (
+                        <motion.div
+                            key={collection.id}
+                            whileHover={{ y: -5 }}
+                            onClick={() => setSelectedCollection(collection)}
+                            className="group cursor-pointer relative aspect-[4/5] overflow-hidden rounded-xl border border-gray-200 dark:border-white/10"
+                        >
+                            {collection.cover ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img 
+                                    src={collection.cover}
+                                    alt={collection.title}
+                                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                                />
+                            ) : (
+                                <div className="w-full h-full bg-gray-100 dark:bg-white/5 flex items-center justify-center">
+                                    <ImageIcon className="text-gray-400" size={32} />
+                                </div>
+                            )}
+                            
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 group-hover:opacity-80 transition-opacity" />
+                            
+                            <div className="absolute bottom-0 left-0 p-6 z-10 w-full">
+                                <h4 className="text-white font-serif italic text-xl mb-1">{collection.title}</h4>
+                                <p className="text-gray-300 text-xs font-mono tracking-widest uppercase">{collection.images.length} Moments</p>
+                            </div>
+                        </motion.div>
+                    ))}
+                </div>
+            </div>
+        )}
       </div>
 
       {/* Expanded Modal */}
@@ -267,6 +324,62 @@ export default function MomentsClient({ moments }: { moments: MomentItem[] }) {
           </div>
         )}
       </AnimatePresence>
+      {/* Collection Modal */}
+      <AnimatePresence>
+          {selectedCollection && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-white dark:bg-black">
+                  <button 
+                      onClick={() => setSelectedCollection(null)}
+                      className="absolute top-4 right-4 md:right-8 z-50 p-2 text-gray-900 dark:text-white"
+                  >
+                      <X size={32} />
+                  </button>
+                  
+                  <div className="w-full h-full overflow-y-auto pt-20 pb-20 px-4 md:px-12">
+                      <div className="max-w-7xl mx-auto">
+                          <div className="text-center mb-16">
+                             <h2 className="text-4xl md:text-6xl font-serif italic mb-4">{selectedCollection.title}</h2>
+                             <p className="font-mono text-sm tracking-widest uppercase text-gray-500">{selectedCollection.description}</p>
+                          </div>
+                          
+                          <div className="columns-1 md:columns-2 lg:columns-3 gap-8 space-y-8">
+                              {selectedCollection.images.map((src, idx) => (
+                                  <motion.div
+                                    key={idx}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    whileInView={{ opacity: 1, y: 0 }}
+                                    viewport={{ once: true }}
+                                    className="break-inside-avoid"
+                                  >
+                                      {isVideo(src) ? (
+                                        <video
+                                          src={src}
+                                          controls
+                                          className="w-full rounded-lg shadow-lg"
+                                        />
+                                      ) : (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img 
+                                            src={src}
+                                            alt={`${selectedCollection.title} - ${idx}`}
+                                            className="w-full rounded-lg shadow-lg"
+                                        />
+                                      )}
+                                  </motion.div>
+                              ))}
+                          </div>
+                          
+                          {selectedCollection.images.length === 0 && (
+                             <div className="text-center py-20 text-gray-500 font-mono text-xs uppercase tracking-widest">
+                                 No images found in collection
+                             </div>
+                          )}
+                      </div>
+                  </div>
+              </div>
+          )}
+      </AnimatePresence>
+
     </div>
   );
 }

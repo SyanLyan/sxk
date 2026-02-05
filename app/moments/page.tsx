@@ -2,10 +2,34 @@ import fs from "fs";
 import path from "path";
 import exifr from "exifr";
 import { withBasePath } from "@/lib/utils";
-import MomentsClient, { MomentItem } from "./moments-client";
+import MomentsClient, { MomentItem, CollectionItem } from "./moments-client";
 
 const imageExtensions = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"]);
 const videoExtensions = new Set([".mp4", ".webm", ".mov"]);
+
+const collectionsConfig = [
+  {
+    id: "her-birthday",
+    folder: "her-birthday",
+    title: "Her Birthday",
+    description: "Celebrating her special day, together.",
+    cover: ""
+  },
+  {
+    id: "my-birthday",
+    folder: "my-birthday",
+    title: "My Birthday",
+    description: "Another year around the sun, with you by my side.",
+    cover: ""
+  },
+  {
+    id: "our-trip",
+    folder: "our-trip",
+    title: "Our Trip Together",
+    description: "New places, shared memories, endless adventures.",
+    cover: ""
+  },
+];
 
 function toTitleFromFilename(filename: string): string {
   const base = filename.replace(path.extname(filename), "");
@@ -18,6 +42,30 @@ function toTitleFromFilename(filename: string): string {
 function getMediaFiles(dir: string): string[] {
   if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir);
+}
+
+function getCollectionImages(folderName: string): string[] {
+  const publicDir = path.join(process.cwd(), "public");
+  const imgPath = path.join(publicDir, "Together", "img", folderName);
+  const videoPath = path.join(publicDir, "Together", "video", folderName);
+
+  const media: string[] = [];
+  
+  // Check for Images
+  if (fs.existsSync(imgPath)) {
+    fs.readdirSync(imgPath)
+      .filter(file => imageExtensions.has(path.extname(file).toLowerCase()))
+      .forEach(file => media.push(withBasePath(`/Together/img/${folderName}/${file}`)));
+  }
+
+  // Check for Videos
+  if (fs.existsSync(videoPath)) {
+    fs.readdirSync(videoPath)
+      .filter(file => videoExtensions.has(path.extname(file).toLowerCase()))
+      .forEach(file => media.push(withBasePath(`/Together/video/${folderName}/${file}`)));
+  }
+
+  return media;
 }
 
 async function getImageDate(fullPath: string, stats: fs.Stats): Promise<Date> {
@@ -45,9 +93,13 @@ async function buildDynamicMoments(): Promise<MomentItem[]> {
   const imageDir = path.join(publicDir, "Together", "img");
   const videoDir = path.join(publicDir, "Together", "video");
 
-  const images = getMediaFiles(imageDir).filter((file) =>
-    imageExtensions.has(path.extname(file).toLowerCase()),
-  );
+  // Get standalone files directly in `Together/img` (not in subfolders)
+  const images = getMediaFiles(imageDir).filter((file) => {
+      const isImage = imageExtensions.has(path.extname(file).toLowerCase());
+      const isFile = fs.statSync(path.join(imageDir, file)).isFile(); 
+      return isImage && isFile;
+  });
+
   const videos = getMediaFiles(videoDir).filter((file) =>
     videoExtensions.has(path.extname(file).toLowerCase()),
   );
@@ -101,7 +153,22 @@ async function buildDynamicMoments(): Promise<MomentItem[]> {
   });
 }
 
+function buildCollections(): CollectionItem[] {
+  return collectionsConfig.map(config => {
+      const images = getCollectionImages(config.folder);
+      return {
+          id: config.id,
+          title: config.title,
+          description: config.description,
+          cover: images.length > 0 ? images[0] : "", // Default to first image
+          images: images
+      };
+  });
+}
+
 export default async function Moments() {
   const moments = await buildDynamicMoments();
-  return <MomentsClient moments={moments} />;
+  const collections = buildCollections();
+  
+  return <MomentsClient moments={moments} collections={collections} />;
 }
