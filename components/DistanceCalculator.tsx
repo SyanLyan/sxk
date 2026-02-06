@@ -80,6 +80,14 @@ type RequestRow = {
   created_at: string;
 };
 
+type SyncedRow = {
+  session_code: string;
+  requester_lat: number | null;
+  requester_lng: number | null;
+  partner_lat: number | null;
+  partner_lng: number | null;
+};
+
 type DistanceCalculatorProps = {
   sessionCode?: string;
 };
@@ -168,49 +176,46 @@ export default function DistanceCalculator({
   useEffect(() => {
     if (!activeSessionCode || !supabase || !clientId) return;
 
+    const applySyncedRow = (row: SyncedRow | null) => {
+      if (!row) return;
+      const requesterPoint =
+        row.requester_lat !== null && row.requester_lng !== null
+          ? { lat: row.requester_lat, lng: row.requester_lng }
+          : null;
+      const partnerPoint =
+        row.partner_lat !== null && row.partner_lng !== null
+          ? { lat: row.partner_lat, lng: row.partner_lng }
+          : null;
+      const isLink = sessionOrigin === "link";
+      setMyLocation(isLink ? partnerPoint : requesterPoint);
+      setPartnerLocation(isLink ? requesterPoint : partnerPoint);
+    };
+
     const fetchInitial = async () => {
       const { data } = await supabase
-        .from("pair_locations")
-        .select("client_id, lat, lng, updated_at")
-        .eq("session_code", activeSessionCode);
+        .from("synced_locations")
+        .select("session_code, requester_lat, requester_lng, partner_lat, partner_lng")
+        .eq("session_code", activeSessionCode)
+        .maybeSingle();
 
-      data?.forEach((row) => {
-        const point = {
-          lat: row.lat,
-          lng: row.lng,
-          updatedAt: row.updated_at,
-        };
-        if (row.client_id === clientId) setMyLocation(point);
-        else setPartnerLocation(point);
-      });
+      applySyncedRow(data ?? null);
     };
 
     fetchInitial();
 
     const locationChannel = supabase
-      .channel(`pair-locations-${activeSessionCode}`)
+      .channel(`synced-locations-${activeSessionCode}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
-          table: "pair_locations",
+          table: "synced_locations",
           filter: `session_code=eq.${activeSessionCode}`,
         },
         (payload) => {
-          const row = payload.new as {
-            client_id: string;
-            lat: number;
-            lng: number;
-            updated_at: string;
-          };
-          const point = {
-            lat: row.lat,
-            lng: row.lng,
-            updatedAt: row.updated_at,
-          };
-          if (row.client_id === clientId) setMyLocation(point);
-          else setPartnerLocation(point);
+          const row = (payload.new ?? payload.old) as SyncedRow | null;
+          applySyncedRow(row ?? null);
         },
       )
       .subscribe();
@@ -238,7 +243,7 @@ export default function DistanceCalculator({
       supabase.removeChannel(locationChannel);
       supabase.removeChannel(requestChannel);
     };
-  }, [clientId, activeSessionCode, supabase]);
+  }, [clientId, activeSessionCode, supabase, sessionOrigin]);
 
   useEffect(() => {
     if (!myLocation || !partnerLocation) return;
@@ -253,7 +258,7 @@ export default function DistanceCalculator({
 
   useEffect(() => {
     if (!hasRequested) return;
-    if (!partnerLocation?.updatedAt) return;
+    if (!partnerLocation) return;
     if (!activeSessionCode || !supabase || !clientId) return;
 
     const clearRequest = async () => {
@@ -268,7 +273,7 @@ export default function DistanceCalculator({
     clearRequest();
   }, [
     hasRequested,
-    partnerLocation?.updatedAt,
+    partnerLocation,
     activeSessionCode,
     supabase,
     clientId,
@@ -278,22 +283,26 @@ export default function DistanceCalculator({
     return new Promise(async (resolve, reject) => {
       const currentLat = FIXED_COORDS.lat;
       const currentLng = FIXED_COORDS.lng;
+      const isLink = sessionOrigin === "link";
 
       setMyLocation({ lat: currentLat, lng: currentLng });
 
       if (activeSessionCode && supabase && clientId) {
-        const { error: upsertError } = await supabase
-          .from("pair_locations")
-          .upsert(
-            {
+        const payload = isLink
+          ? {
               session_code: activeSessionCode,
-              client_id: clientId,
-              lat: currentLat,
-              lng: currentLng,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "session_code,client_id" },
-          );
+              partner_lat: currentLat,
+              partner_lng: currentLng,
+            }
+          : {
+              session_code: activeSessionCode,
+              requester_lat: currentLat,
+              requester_lng: currentLng,
+            };
+
+        const { error: upsertError } = await supabase
+          .from("synced_locations")
+          .upsert(payload, { onConflict: "session_code" });
 
         if (upsertError) {
           reject(upsertError);
@@ -395,7 +404,7 @@ export default function DistanceCalculator({
       : 0;
   const direction = bearingToCompass(bearing);
   const isLinkSession = sessionOrigin === "link";
-  const partnerSynced = Boolean(partnerLocation?.updatedAt);
+  const partnerSynced = Boolean(partnerLocation);
 
   return (
     <section className="min-h-[60vh] w-full flex flex-col items-center justify-center relative py-12 px-4 overflow-hidden">
