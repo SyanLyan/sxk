@@ -79,6 +79,8 @@ type SyncedRow = {
   partner_lat: number | null;
   partner_lng: number | null;
   is_synced: boolean | null;
+  created_at?: string;
+  updated_at?: string;
 };
 
 type DistanceCalculatorProps = {
@@ -97,6 +99,7 @@ export default function DistanceCalculator({
   const [requesting, setRequesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSynced, setIsSynced] = useState(false); // DB flag
+  const [lastSyncedTime, setLastSyncedTime] = useState<string | null>(null);
   const [clientId, setClientId] = useState<string | null>(null);
   const [activeSessionCode, setActiveSessionCode] = useState<string | null>(
     sessionCode ?? null,
@@ -173,6 +176,9 @@ export default function DistanceCalculator({
       
       const synced = row.is_synced === true;
       setIsSynced(synced);
+      if (row.updated_at) {
+        setLastSyncedTime(row.updated_at);
+      }
 
       const requesterPoint =
         row.requester_lat !== null && row.requester_lng !== null
@@ -191,7 +197,7 @@ export default function DistanceCalculator({
     const fetchSyncedData = async () => {
       const { data } = await supabase
         .from("synced_locations")
-        .select("session_code, requester_lat, requester_lng, partner_lat, partner_lng, is_synced")
+        .select("session_code, requester_lat, requester_lng, partner_lat, partner_lng, is_synced, updated_at")
         .eq("session_code", activeSessionCode)
         .maybeSingle();
 
@@ -264,11 +270,13 @@ export default function DistanceCalculator({
                   session_code: activeSessionCode,
                   partner_lat: currentLat,
                   partner_lng: currentLng,
+                  updated_at: new Date().toISOString(),
                 }
               : {
                   session_code: activeSessionCode,
                   requester_lat: currentLat,
                   requester_lng: currentLng,
+                  updated_at: new Date().toISOString(),
                 };
 
             if (typeof setSyncedStatus === "boolean") {
@@ -365,6 +373,21 @@ export default function DistanceCalculator({
   const isLinkSession = sessionOrigin === "link";
   const partnerSynced = Boolean(partnerLocation);
 
+  const formatLastSynced = (isoString: string | null) => {
+    if (!isoString) return "";
+    const date = new Date(isoString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    if (diffMins < 1) return "Just now";
+    if (diffMins === 1) return "1 min ago";
+    if (diffMins < 60) return `${diffMins} mins ago`;
+    const diffHrs = Math.floor(diffMins / 60);
+    if (diffHrs === 1) return "1 hr ago";
+    return `${diffHrs} hrs ago`;
+  };
+
   return (
     <section className="min-h-[60vh] w-full flex flex-col items-center justify-center relative py-12 px-4 overflow-hidden">
       {/* Radar Effect - More ambient & large */}
@@ -438,16 +461,23 @@ export default function DistanceCalculator({
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: 20, opacity: 0 }}
-                className="absolute left-1/2 -translate-x-1/2 -top-12 bg-black/50 border border-purple-500/30 backdrop-blur-md px-4 py-2 rounded text-center z-20"
+                className="absolute left-1/2 -translate-x-1/2 -top-12 bg-black/50 border border-purple-500/30 backdrop-blur-md px-4 py-2 rounded text-center z-20 min-w-[200px]"
               >
                 <span className="block text-2xl font-bold font-mono text-white text-shadow-glow">
                   {formatKm(distanceKm)}
                 </span>
-                {driveMinutes && (
-                  <span className="text-[9px] text-gray-400 uppercase tracking-wider block">
-                    ~{driveMinutes} mins away
-                  </span>
-                )}
+                <div className="flex flex-col gap-0.5">
+                  {driveMinutes && (
+                    <span className="text-[9px] text-gray-400 uppercase tracking-wider block">
+                      ~{driveMinutes} mins away
+                    </span>
+                  )}
+                  {lastSyncedTime && (
+                    <span className="text-[9px] text-purple-300 font-mono tracking-wider block animate-pulse">
+                      Hearts synced {formatLastSynced(lastSyncedTime)}
+                    </span>
+                  )}
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -483,7 +513,7 @@ export default function DistanceCalculator({
         )}
 
         {/* Control Actions */}
-        <div className="flex flex-col md:flex-row items-center justify-center gap-6 mt-8">
+        <div className="flex flex-col md:flex-row items-center justify-center gap-6 mt-8 mb-20">
           {isLinkSession && (
             <button
               onClick={shareLocation}
@@ -535,9 +565,11 @@ export default function DistanceCalculator({
                 />
                 {requesting
                   ? "Pinging..."
-                  : !!myLocation && !isSynced
-                    ? "Signal Sent"
-                    : "Ping Signal"}
+                  : isSynced
+                    ? "Update My Signal"
+                    : !!myLocation
+                      ? "Signal Sent"
+                      : "Ping Signal"}
               </span>
             </button>
           )}
