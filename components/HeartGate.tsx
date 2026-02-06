@@ -14,11 +14,9 @@ export default function HeartGate({ onUnlock }: HeartGateProps) {
   const [progress, setProgress] = useState(0);
   const [isUnlocked, setIsUnlocked] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const lastTapRef = useRef<number | null>(null);
   const sessionSetRef = useRef(false);
   const SESSION_CODE_KEY = "sxk-session-code";
   const SESSION_ORIGIN_KEY = "sxk-session-origin";
-  const DOUBLE_TAP_SESSION_CODE = "12272024";
 
   // Sound effect refs could go here
 
@@ -115,31 +113,6 @@ export default function HeartGate({ onUnlock }: HeartGateProps) {
     }
   };
 
-  const handleSignalUnlock = (code?: string) => {
-    if (code) {
-      handleUnlock(code, "local");
-      return;
-    }
-    const stored = localStorage.getItem(SESSION_CODE_KEY);
-    if (stored) {
-      handleUnlock(stored, "local");
-      return;
-    }
-    handleUnlock(undefined, "local");
-  };
-
-  const handleSignalTap = () => {
-    const now = Date.now();
-    if (lastTapRef.current && now - lastTapRef.current < 300) {
-      setIsHolding(false);
-      setProgress(0);
-      handleSignalUnlock(DOUBLE_TAP_SESSION_CODE);
-      lastTapRef.current = null;
-      return;
-    }
-    lastTapRef.current = now;
-  };
-
   return (
     <AnimatePresence>
       {!isUnlocked && (
@@ -175,8 +148,6 @@ export default function HeartGate({ onUnlock }: HeartGateProps) {
                {/* The Button Container */}
                <div
                  className="relative w-32 h-32 flex items-center justify-center"
-                 onClick={handleSignalTap}
-                 onTouchEnd={handleSignalTap}
                >
                   {/* Background Track */}
                   <Heart 
