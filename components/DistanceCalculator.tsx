@@ -1,26 +1,35 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { MapPin, Navigation, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Navigation,
+  Send,
+  User,
+  Radar,
+  Heart,
+  MapPin
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { createBrowserSupabaseClient } from "@/lib/supabaseClient";
+
+// ...existing code...
+// (Keep CONSTANTS: HER_AVATAR, MY_AVATAR_FALLBACK, etc. unchanged)
+const HER_AVATAR = "/Her/img/casual/1000009032.jpeg";
+const MY_AVATAR_FALLBACK = "S"; 
+
 const HER_LOCATION = {
-  lat: 16.789663, // Yangon Latitude
-  lng: 96.191354, // Yangon Longitude
-  name: "Her Heart",
+  lat: 16.789663,
+  lng: 96.191354,
+  name: "Her",
 };
 
-const MY_LOCATION = {
-  lat: 16.855284,
-  lng: 96.1209266,
-};
+const KM_PER_HOUR_DRIVE = 40;
+const LOCAL_ID_KEY = "sxk-client-id";
 
-function calculateDistance(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number,
-) {
-  const R = 6371; // Radius of the earth in km
+// (Keep Helper Functions: calculateDistance, deg2rad, formatKm, getDriveMinutes, getBearing, bearingToCompass unchanged)
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371;
   const dLat = deg2rad(lat2 - lat1);
   const dLon = deg2rad(lon2 - lon1);
   const a =
@@ -30,85 +39,295 @@ function calculateDistance(
       Math.sin(dLon / 2) *
       Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const d = R * c; // Distance in km
-  return d;
+  return R * c;
 }
 
 function deg2rad(deg: number) {
   return deg * (Math.PI / 180);
 }
 
-export default function DistanceCalculator() {
-  const [myLocation, setMyLocation] = useState<{
-    lat: number;
-    lng: number;
-  } | null>(null);
-  const [distance, setDistance] = useState<number | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const CALC_DELAY_MS = 5000;
+function formatKm(km: number) {
+  if (km < 1) return `${(km * 1000).toFixed(0)}m`;
+  return `${km.toFixed(1)}km`;
+}
 
-  const getLocation = () => {
+function getDriveMinutes(km: number) {
+  return Math.max(1, Math.round((km / KM_PER_HOUR_DRIVE) * 60));
+}
+
+function getBearing(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const y = Math.sin(deg2rad(lon2 - lon1)) * Math.cos(deg2rad(lat2));
+  const x =
+    Math.cos(deg2rad(lat1)) * Math.sin(deg2rad(lat2)) -
+    Math.sin(deg2rad(lat1)) *
+      Math.cos(deg2rad(lat2)) *
+      Math.cos(deg2rad(lon2 - lon1));
+  const bearing = (Math.atan2(y, x) * 180) / Math.PI;
+  return (bearing + 360) % 360;
+}
+
+function bearingToCompass(bearing: number) {
+  const directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+  const index = Math.round(bearing / 45) % 8;
+  return directions[index];
+}
+
+type LocationPoint = {
+  lat: number;
+  lng: number;
+  updatedAt?: string;
+};
+
+type RequestRow = {
+  id: string;
+  requester_id: string;
+  requester_label: string | null;
+  created_at: string;
+};
+
+type DistanceCalculatorProps = {
+  sessionCode?: string;
+};
+
+export default function DistanceCalculator({ sessionCode }: DistanceCalculatorProps) {
+  const [myLocation, setMyLocation] = useState<LocationPoint | null>(null);
+  const [partnerLocation, setPartnerLocation] = useState<LocationPoint | null>(null);
+  const [distanceKm, setDistanceKm] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [requesting, setRequesting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pendingRequest, setPendingRequest] = useState<RequestRow | null>(null);
+  const [clientId, setClientId] = useState<string | null>(null);
+  const CALC_DELAY_MS = 800;
+
+  // ...existing code...
+  // (All useEffect hooks remain the same)
+  const supabase = useMemo(() => {
+        if (!sessionCode) return null;
+        return createBrowserSupabaseClient();
+      }, [sessionCode]);
+    
+      useEffect(() => {
+        if (!sessionCode) {
+          setPartnerLocation({ lat: HER_LOCATION.lat, lng: HER_LOCATION.lng });
+        }
+      }, [sessionCode]);
+    
+      useEffect(() => {
+        let stored = localStorage.getItem(LOCAL_ID_KEY);
+        if (!stored) {
+          stored = crypto.randomUUID();
+          localStorage.setItem(LOCAL_ID_KEY, stored);
+        }
+        setClientId(stored);
+      }, []);
+    
+      useEffect(() => {
+        if (!sessionCode || !supabase || !clientId) return;
+    
+        const fetchInitial = async () => {
+          const { data } = await supabase
+            .from("pair_locations")
+            .select("client_id, lat, lng, updated_at")
+            .eq("session_code", sessionCode);
+    
+          data?.forEach((row) => {
+            const point = {
+              lat: row.lat,
+              lng: row.lng,
+              updatedAt: row.updated_at,
+            };
+            if (row.client_id === clientId) setMyLocation(point);
+            else setPartnerLocation(point);
+          });
+        };
+    
+        fetchInitial();
+    
+        const locationChannel = supabase
+          .channel(`pair-locations-${sessionCode}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "pair_locations",
+              filter: `session_code=eq.${sessionCode}`,
+            },
+            (payload) => {
+              const row = payload.new as {
+                client_id: string;
+                lat: number;
+                lng: number;
+                updated_at: string;
+              };
+              const point = {
+                lat: row.lat,
+                lng: row.lng,
+                updatedAt: row.updated_at,
+              };
+              if (row.client_id === clientId) setMyLocation(point);
+              else setPartnerLocation(point);
+            },
+          )
+          .subscribe();
+    
+        const requestChannel = supabase
+          .channel(`pair-requests-${sessionCode}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "INSERT",
+              schema: "public",
+              table: "pair_requests",
+              filter: `session_code=eq.${sessionCode}`,
+            },
+            (payload) => {
+              const row = payload.new as RequestRow;
+              if (row.requester_id !== clientId) {
+                setPendingRequest(row);
+              }
+            },
+          )
+          .subscribe();
+    
+        return () => {
+          supabase.removeChannel(locationChannel);
+          supabase.removeChannel(requestChannel);
+        };
+      }, [clientId, sessionCode, supabase]);
+    
+      useEffect(() => {
+        if (!myLocation || !partnerLocation) return;
+        const dist = calculateDistance(
+          myLocation.lat,
+          myLocation.lng,
+          partnerLocation.lat,
+          partnerLocation.lng,
+        );
+        setDistanceKm(dist);
+      }, [myLocation, partnerLocation]);
+
+  const syncLocation = async (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error("Geolocation not supported"));
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const currentLat = position.coords.latitude;
+          const currentLng = position.coords.longitude;
+          setMyLocation({ lat: currentLat, lng: currentLng });
+
+          if (sessionCode && supabase && clientId) {
+            const { error: upsertError } = await supabase
+              .from("pair_locations")
+              .upsert(
+                {
+                  session_code: sessionCode,
+                  client_id: clientId,
+                  lat: currentLat,
+                  lng: currentLng,
+                  updated_at: new Date().toISOString(),
+                },
+                { onConflict: "session_code,client_id" },
+              );
+
+            if (upsertError) {
+              reject(upsertError);
+            } else {
+              resolve();
+            }
+          } else if (!sessionCode) {
+             // Allow offline/demo use
+             resolve();
+          }
+        },
+        (err) => {
+          reject(err);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+      );
+    });
+  };
+
+  const requestLocation = async () => {
+    if (!sessionCode || !supabase || !clientId) return;
+
+    setRequesting(true);
+    setError(null);
+    
+    // Also set loading state for visual feedback on the map icon
+    setLoading(true);
+
+    try {
+      // 1. Sync my location first so it's ready when they open the link
+      await syncLocation();
+
+      // 2. Send the Telegram Notification
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const entryUrl = origin
+        ? `${origin}/entry/${sessionCode}`
+        : `/entry/${sessionCode}`;
+      const message = `📍 Signal Request.\nPartner is waiting at: ${entryUrl}`;
+
+      await fetch("/api/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message }),
+      });
+
+      // 3. Create a request record to trigger UI on their active screen (if open)
+      await supabase.from("pair_requests").insert({
+        session_code: sessionCode,
+        requester_id: clientId,
+        requester_label: "Partner",
+      });
+    } catch (err) {
+      console.error(err);
+      setError("Failed to sync and send request");
+    } finally {
+      setRequesting(false);
+      setLoading(false);
+    }
+  };
+
+  const shareLocation = async () => {
     setLoading(true);
     setError(null);
 
-    if (!navigator.geolocation) {
-      useFallbackLocation("Geolocation not supported");
-      return;
+    try {
+      await syncLocation();
+
+      /* Accept any pending request when sharing */
+      if (pendingRequest?.id && supabase) {
+        await supabase
+          .from("pair_requests")
+          .delete()
+          .eq("id", pendingRequest.id);
+        setPendingRequest(null);
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Location access denied or failed");
+    } finally {
+      // Add a small artificial delay for UX smoothness if it was too fast
+      setTimeout(() => setLoading(false), CALC_DELAY_MS);
     }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const currentLat = position.coords.latitude;
-        const currentLng = position.coords.longitude;
-
-        setMyLocation({ lat: currentLat, lng: currentLng });
-
-        const dist = calculateDistance(
-          currentLat,
-          currentLng,
-          HER_LOCATION.lat,
-          HER_LOCATION.lng,
-        );
-
-        setTimeout(() => {
-          setDistance(dist);
-          setLoading(false);
-        }, CALC_DELAY_MS);
-      },
-      () => {
-        useFallbackLocation("Using saved coordinates");
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
-      },
-    );
   };
-  const useFallbackLocation = (message?: string) => {
-    const { lat, lng } = MY_LOCATION;
 
-    setMyLocation({ lat, lng });
-
-    const dist = calculateDistance(
-      lat,
-      lng,
-      HER_LOCATION.lat,
-      HER_LOCATION.lng,
-    );
-
-    setTimeout(() => {
-      setDistance(dist);
-      setError(message ?? null);
-      setLoading(false);
-    }, CALC_DELAY_MS);
-  };
+  const displayDistanceKm = distanceKm;
+  const driveMinutes = displayDistanceKm ? getDriveMinutes(displayDistanceKm) : null;
+  const bearing = (myLocation && partnerLocation) 
+    ? getBearing(myLocation.lat, myLocation.lng, partnerLocation.lat, partnerLocation.lng)
+    : 0;
+  const direction = bearingToCompass(bearing);
 
   return (
-    <section className="min-h-screen w-full flex flex-col items-center justify-center relative py-20">
-      {/* Floating Elements without Card */}
-      <div className="max-w-4xl w-full mx-4 relative flex flex-col items-center">
+    <section className="min-h-[60vh] w-full flex flex-col items-center justify-center relative py-12 px-4 overflow-hidden">
+        
         {/* Radar Effect - More ambient & large */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full pointer-events-none overflow-visible flex items-center justify-center -z-10">
           <div className="w-[600px] h-[600px] border border-purple-500/10 dark:border-purple-500/10 rounded-full animate-[ping_4s_cubic-bezier(0,0,0.2,1)_infinite]" />
@@ -116,113 +335,165 @@ export default function DistanceCalculator() {
           <div className="absolute w-[200px] h-[200px] border border-purple-500/30 dark:border-purple-500/30 rounded-full animate-[ping_4s_cubic-bezier(0,0,0.2,1)_infinite_2s]" />
         </div>
 
-        <h3 className="text-xl md:text-2xl font-mono text-purple-950 dark:text-purple-300 text-center mb-16 uppercase tracking-[0.3em] flex items-center justify-center gap-4">
-          <Navigation size={20} className="animate-pulse text-purple-700 dark:text-purple-400" /> Signal Link
-        </h3>
-
-        {/* Connection Visual - Minimal & Wide */}
-        <div className="flex justify-between items-center w-full max-w-2xl mb-24 relative">
-          {/* My Location Node */}
-          <div className="flex flex-col items-center gap-4 z-10 group">
-            <div
-              className={`w-16 h-16 rounded-full border border-gray-300 dark:border-white/20 flex items-center justify-center transition-all duration-500 bg-white dark:bg-black/50 backdrop-blur-sm ${myLocation ? "border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.3)]" : "group-hover:border-purple-600 dark:group-hover:border-white/50"}`}
-            >
-              <MapPin
-                size={24}
-                className={
-                  myLocation
-                    ? "text-green-600 dark:text-green-400"
-                    : "text-gray-700 dark:text-gray-600"
-                }
-              />
+        {/* --- MAIN CARD --- */}
+        <div className="max-w-2xl w-full relative z-10 flex flex-col items-center">
+            
+            {/* SIGNAL HEADER */}
+            <div className="text-center mb-12 flex flex-col items-center gap-2">
+                <Radar className="text-purple-500 w-5 h-5 animate-pulse" />
+                <h3 className="text-sm md:text-md font-mono tracking-[0.3em] uppercase text-purple-200">
+                    Signal Link
+                </h3>
             </div>
-            <span className="text-[10px] md:text-xs font-mono text-gray-800 dark:text-gray-500 tracking-[0.2em] uppercase font-semibold">
-              Your Location
-            </span>
-          </div>
+            
+            {/* TWO POINTS LAYOUT */}
+            <div className="w-full flex items-center justify-between px-2 md:px-12 relative mb-16">
+                 
+                 {/* CENTER LINE */}
+                 <div className="absolute left-16 right-16 top-1/2 -translate-y-1/2 h-[1px] bg-purple-500/20">
+                     {distanceKm !== null && (
+                         <motion.div 
+                            layoutId="signal-beam"
+                            className="h-[2px] bg-purple-500 shadow-[0_0_10px_#a855f7]"
+                            initial={{ width: 0 }}
+                            animate={{ width: "100%" }}
+                            transition={{ duration: 1.5 }}
+                         />
+                     )}
+                 </div>
 
-          {/* Connecting Line - Glowing Laser */}
-          <div className="flex-1 h-[1px] bg-purple-200 dark:bg-white/5 mx-8 relative overflow-hidden">
-            {distance !== null && (
-              <>
-                <motion.div
-                  initial={{ width: "0%" }}
-                  animate={{ width: "100%" }}
-                  transition={{ duration: 2, ease: "circOut" }}
-                  className="absolute inset-0 bg-gradient-to-r from-transparent via-purple-700 dark:via-purple-500 to-transparent shadow-[0_0_20px_rgba(124,58,237,0.8)] dark:shadow-[0_0_20px_rgba(168,85,247,0.8)]"
-                />
-                <div className="absolute inset-0 bg-purple-500/20 dark:bg-purple-500/20 blur-sm" />
-              </>
+                 {/* LEFT: YOU */}
+                 <div className="relative flex flex-col items-center gap-4 group cursor-default">
+                    <motion.div 
+                        whileHover={{ scale: 1.1 }}
+                        className="w-16 h-16 rounded-full border border-gray-700 bg-background/50 backdrop-blur-md flex items-center justify-center relative shadow-2xl z-10"
+                    >
+                         {loading ? (
+                             <div className="absolute inset-0 rounded-full border-2 border-t-purple-500 border-r-transparent animate-spin" />
+                         ) : (
+                             <MapPin size={20} className={cn("text-gray-400 group-hover:text-purple-400 transition-colors", distanceKm !== null && "text-purple-500")} />
+                         )}
+                    </motion.div>
+                    <span className="text-[10px] font-mono tracking-widest text-gray-500 uppercase">Your Location</span>
+                 </div>
+
+                 {/* DISTANCE (Floating in middle if active) */}
+                 <AnimatePresence>
+                     {distanceKm !== null && (
+                         <motion.div 
+                            initial={{ y: 20, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            exit={{ y: 20, opacity: 0 }}
+                            className="absolute left-1/2 -translate-x-1/2 -top-12 bg-black/50 border border-purple-500/30 backdrop-blur-md px-4 py-2 rounded text-center z-20"
+                         >
+                             <span className="block text-2xl font-bold font-mono text-white text-shadow-glow">
+                                 {formatKm(distanceKm)}
+                             </span>
+                             {driveMinutes && (
+                                 <span className="text-[9px] text-gray-400 uppercase tracking-wider block">
+                                     ~{driveMinutes} mins away
+                                 </span>
+                             )}
+                         </motion.div>
+                     )}
+                 </AnimatePresence>
+
+                 {/* RIGHT: HER */}
+                 <div className="relative flex flex-col items-center gap-4 group cursor-default">
+                    <motion.div 
+                        whileHover={{ scale: 1.1 }}
+                        className={cn(
+                            "w-16 h-16 rounded-full border border-gray-700 bg-background/50 backdrop-blur-md flex items-center justify-center relative shadow-2xl z-10 overflow-hidden",
+                            distanceKm !== null && "border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.3)]"
+                        )}
+                    >
+                         {/* Image or Icon */}
+                        <img src={HER_AVATAR} alt="Her" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                    </motion.div>
+                    <span className="text-[10px] font-mono tracking-widest text-gray-500 uppercase">Her Heart</span>
+                 </div>
+            </div>
+
+            {/* PENDING REQUEST ALERT */}
+            <AnimatePresence>
+                {pendingRequest && (
+                    <motion.div 
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="mb-8 w-full max-w-sm"
+                    >
+                        <div className="bg-purple-900/20 border border-purple-500/40 p-4 rounded text-center">
+                            <p className="text-xs text-purple-300 font-mono mb-3 uppercase tracking-wider">Incoming Signal Request</p>
+                            <button onClick={shareLocation} className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded uppercase font-bold tracking-widest">
+                                Accept Link
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* ERROR MESSAGE */}
+            {error && (
+                <p className="text-red-400 text-xs font-mono mb-6 bg-red-900/20 px-3 py-1 rounded border border-red-900/30">
+                    Error: {error}
+                </p>
             )}
-          </div>
 
-          {/* Her Location Node */}
-          <div className="flex flex-col items-center gap-4 z-10">
-            <div className="w-16 h-16 rounded-full border border-purple-600 dark:border-purple-500 bg-purple-100 dark:bg-purple-500/10 backdrop-blur-sm text-purple-700 dark:text-purple-400 flex items-center justify-center shadow-[0_0_30px_rgba(124,58,237,0.4)] dark:shadow-[0_0_30px_rgba(168,85,247,0.4)] animate-pulse-slow">
-              <MapPin size={24} />
-            </div>
-            <span className="text-[10px] md:text-xs font-mono text-gray-800 dark:text-gray-500 tracking-[0.2em] uppercase font-semibold">
-              Her Heart
-            </span>
-          </div>
-        </div>
-
-        {/* Results / Action */}
-        <div className="text-center relative z-10 min-h-[120px] flex flex-col justify-center items-center">
-          {distance !== null ? (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex flex-col items-center"
-            >
-              <span className="text-xs text-purple-700 dark:text-purple-300/50 font-mono mb-2 tracking-widest font-semibold">
-                CALCULATED DISTANCE
-              </span>
-              <h2 className="text-5xl md:text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-gray-900 to-purple-900 dark:from-white dark:to-white/50 font-sans tracking-tighter">
-                {distance.toFixed(0)}
-                <span className="text-2xl md:text-4xl text-purple-700 dark:text-purple-500 ml-2">
-                  KM
-                </span>
-              </h2>
-              <p className="text-sm text-gray-900 dark:text-gray-400 mt-6 font-mono max-w-md leading-relaxed border-t border-purple-200 dark:border-white/10 pt-6 font-medium">
-                "No specific number can measure <br /> how close we truly are."
-              </p>
-            </motion.div>
-          ) : (
-            <>
-              {loading ? (
-                <div className="flex flex-col items-center gap-4 text-purple-700 dark:text-purple-400">
-                  <Loader2 className="animate-spin w-8 h-8" />
-                  <span className="text-xs font-mono animate-pulse tracking-widest font-semibold">
-                    TRIANGULATING SATELLITES...
-                  </span>
-                </div>
-              ) : (
+            {/* Control Actions */}
+            <div className="flex flex-col md:flex-row items-center justify-center gap-6 mt-8">
                 <button
-                  onClick={getLocation}
+                  onClick={shareLocation}
+                  disabled={loading}
                   className="group relative px-8 py-4 bg-transparent overflow-hidden rounded-none"
                 >
                   <div className="absolute inset-0 w-full h-full bg-purple-100 dark:bg-purple-500/10 border border-purple-400 dark:border-purple-500/30 group-hover:bg-purple-200 dark:group-hover:bg-purple-500/20 dark:group-hover:border-purple-400/70 transition-colors" />
                   <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-purple-700 dark:via-purple-400 to-transparent opacity-50 group-hover:opacity-100 transition-opacity" />
 
                   <span className="relative font-mono text-sm tracking-[0.3em] uppercase flex items-center gap-3 text-purple-950 dark:text-purple-100 font-bold">
-                    <Navigation
-                      size={16}
-                      className="group-hover:-translate-y-1 group-hover:translate-x-1 transition-transform duration-500 text-purple-800 dark:text-purple-200"
-                    />
-                    Initiate Scan
+                    {loading ? (
+                        <Radar size={16} className="animate-spin text-purple-800 dark:text-purple-200" />
+                    ) : ( 
+                        <Navigation
+                        size={16}
+                        className="group-hover:-translate-y-1 group-hover:translate-x-1 transition-transform duration-500 text-purple-800 dark:text-purple-200"
+                        />
+                    )}
+                    {loading ? "Scanning..." : "Initiate Scan"}
                   </span>
                 </button>
-              )}
-              {error && (
-                <p className="text-red-500 text-xs mt-6 font-mono bg-red-500/10 px-4 py-2 rounded">
-                  {error}
-                </p>
-              )}
-            </>
-          )}
+
+                {sessionCode && supabase && (
+                    <button
+                        onClick={requestLocation}
+                        disabled={requesting}
+                        className="group relative px-8 py-4 bg-transparent overflow-hidden rounded-none"
+                    >
+                        <div className="absolute inset-0 w-full h-full bg-white/50 dark:bg-white/5 border border-purple-400/50 dark:border-purple-500/20 group-hover:border-purple-500/50 transition-colors" />
+                        
+                        <span className="relative font-mono text-sm tracking-[0.3em] uppercase flex items-center gap-3 text-purple-950 dark:text-purple-100 font-bold">
+                            <Send size={16} className={cn("text-purple-800 dark:text-purple-200", requesting && "animate-pulse")} />
+                            {requesting ? "Pinging..." : "Ping Signal"}
+                        </span>
+                    </button>
+                )}
+            </div>
+
+            {/* DIRECTION FOOTER */}
+            {distanceKm !== null && direction && (
+                <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="mt-12 text-center"
+                >
+                    <div className="inline-flex items-center gap-2 text-gray-500 text-[10px] font-mono uppercase tracking-widest border border-gray-800 px-3 py-1 rounded-full">
+                        <Navigation size={10} style={{ transform: `rotate(${bearing}deg)` }} />
+                        <span>Direction: {direction}</span>
+                    </div>
+                </motion.div>
+            )}
+
         </div>
-      </div>
     </section>
   );
 }

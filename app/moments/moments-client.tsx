@@ -23,6 +23,12 @@ import { cn } from "@/lib/utils";
 // Helper to check for video files
 const isVideo = (src: string) => /\.(mp4|webm|mov)$/i.test(src);
 
+const getTitleFromSrc = (src: string) => {
+  const filename = src.split('/').pop() || "";
+  const name = filename.substring(0, filename.lastIndexOf('.')) || filename;
+  return name.replace(/[_-]+/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+};
+
 export type MomentItem = {
   id: number;
   title: string;
@@ -349,21 +355,31 @@ export default function MomentsClient({ moments, collections }: { moments: Momen
                                     initial={{ opacity: 0, y: 20 }}
                                     whileInView={{ opacity: 1, y: 0 }}
                                     viewport={{ once: true }}
-                                    className="break-inside-avoid"
+                                    className="break-inside-avoid mb-8"
                                   >
                                       {isVideo(src) ? (
-                                        <video
-                                          src={src}
-                                          controls
-                                          className="w-full rounded-lg shadow-lg"
-                                        />
+                                        <div className="space-y-2">
+                                            <video
+                                              src={src}
+                                              controls
+                                              className="w-full rounded-lg shadow-lg"
+                                            />
+                                            <p className="text-center font-serif italic text-gray-600 dark:text-gray-400 text-sm">
+                                                {getTitleFromSrc(src)}
+                                            </p>
+                                        </div>
                                       ) : (
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        <img 
-                                            src={src}
-                                            alt={`${selectedCollection.title} - ${idx}`}
-                                            className="w-full rounded-lg shadow-lg"
-                                        />
+                                        <div className="space-y-2">
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img 
+                                                src={src}
+                                                alt={`${selectedCollection.title} - ${idx}`}
+                                                className="w-full rounded-lg shadow-lg"
+                                            />
+                                            <p className="text-center font-serif italic text-gray-600 dark:text-gray-400 text-sm">
+                                                {getTitleFromSrc(src)}
+                                            </p>
+                                        </div>
                                       )}
                                   </motion.div>
                               ))}

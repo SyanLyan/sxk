@@ -35,6 +35,12 @@ const collectionsConfig = [
     folder: "secret",
     title: "Secret Archive",
     description: "Only for us.",
+  },
+  {
+    id: "date-bites",
+    folder: "date-bites",
+    title: "Date-Bites",
+    description: "Food, laughs, and us."
   }
 ];
 
