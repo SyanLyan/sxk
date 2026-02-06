@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useAnimation, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Heart, Fingerprint } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -14,8 +14,18 @@ export default function HeartGate({ onUnlock }: HeartGateProps) {
   const [progress, setProgress] = useState(0);
   const [isUnlocked, setIsUnlocked] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastTapRef = useRef<number | null>(null);
+  const sessionSetRef = useRef(false);
+  const SESSION_CODE_KEY = "sxk-session-code";
+  const SESSION_ORIGIN_KEY = "sxk-session-origin";
+  const DOUBLE_TAP_SESSION_CODE = "12272024";
 
   // Sound effect refs could go here
+
+  useEffect(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  }, []);
 
   useEffect(() => {
     // Lock body scroll when locked
@@ -55,12 +65,79 @@ export default function HeartGate({ onUnlock }: HeartGateProps) {
     };
   }, [isHolding, isUnlocked]);
 
-  const handleUnlock = () => {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sessionFromUrl = params.get("session");
+    if (sessionFromUrl) {
+      handleUnlock(sessionFromUrl, "link");
+    }
+  }, []);
+
+  const generateSessionCode = () => {
+    return Math.random().toString(36).slice(2, 8).toUpperCase();
+  };
+
+  const handleUnlock = (code?: string, origin?: "local" | "link") => {
+    if (code) {
+      setSessionCode(code);
+      if (origin) setSessionOrigin(origin);
+    } else if (!sessionSetRef.current) {
+      setSessionCode(generateSessionCode());
+      setSessionOrigin("local");
+    }
     setIsUnlocked(true);
     if (intervalRef.current) clearInterval(intervalRef.current);
     setTimeout(() => {
       onUnlock();
     }, 1000); // Wait for exit animation
+  };
+
+  const setSessionCode = (code: string) => {
+    try {
+      sessionSetRef.current = true;
+      localStorage.setItem(SESSION_CODE_KEY, code);
+      window.dispatchEvent(
+        new CustomEvent("sxk-session-code", { detail: code }),
+      );
+    } catch {
+      // Ignore storage errors; signal mode still unlocks.
+    }
+  };
+
+  const setSessionOrigin = (origin: "local" | "link") => {
+    try {
+      localStorage.setItem(SESSION_ORIGIN_KEY, origin);
+      window.dispatchEvent(
+        new CustomEvent("sxk-session-origin", { detail: origin }),
+      );
+    } catch {
+      // Ignore storage errors; origin is optional.
+    }
+  };
+
+  const handleSignalUnlock = (code?: string) => {
+    if (code) {
+      handleUnlock(code, "local");
+      return;
+    }
+    const stored = localStorage.getItem(SESSION_CODE_KEY);
+    if (stored) {
+      handleUnlock(stored, "local");
+      return;
+    }
+    handleUnlock(undefined, "local");
+  };
+
+  const handleSignalTap = () => {
+    const now = Date.now();
+    if (lastTapRef.current && now - lastTapRef.current < 300) {
+      setIsHolding(false);
+      setProgress(0);
+      handleSignalUnlock(DOUBLE_TAP_SESSION_CODE);
+      lastTapRef.current = null;
+      return;
+    }
+    lastTapRef.current = now;
   };
 
   return (
@@ -96,7 +173,11 @@ export default function HeartGate({ onUnlock }: HeartGateProps) {
                />
 
                {/* The Button Container */}
-               <div className="relative w-32 h-32 flex items-center justify-center">
+               <div
+                 className="relative w-32 h-32 flex items-center justify-center"
+                 onClick={handleSignalTap}
+                 onTouchEnd={handleSignalTap}
+               >
                   {/* Background Track */}
                   <Heart 
                     size={80} 

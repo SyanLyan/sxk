@@ -20,11 +20,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text: message }),
-  });
+  const url = new URL(`https://api.telegram.org/bot${token}/sendMessage`);
+  url.searchParams.set("chat_id", chatId);
+  url.searchParams.set("text", message);
+
+  const response = await fetch(url.toString(), { method: "POST" });
 
   if (!response.ok) {
     const details = await response.text();

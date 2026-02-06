@@ -68,7 +68,6 @@ function getMediaForCollection(folderName: string, isVideo = false): string[] {
                  return withBasePath(`/${relativePath.replace(/\\/g, '/')}/${file}`);
             });
     } catch (error) {
-        console.error(`Error reading directory ${fullPath}:`, error);
         return [];
     }
 }
