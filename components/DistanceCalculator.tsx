@@ -493,23 +493,23 @@ export default function DistanceCalculator({
               exit={{ opacity: 0, y: -10 }}
               className="mb-12 flex flex-col items-center"
             >
-              <div className="bg-black/60 border border-purple-500/30 backdrop-blur-md px-8 py-4 rounded-xl text-center shadow-[0_0_30px_rgba(0,0,0,0.5)] min-w-[220px]">
+              <div className="bg-white/90 dark:bg-black/80 border border-purple-200 dark:border-purple-500/30 backdrop-blur-md px-10 py-6 rounded-2xl text-center shadow-xl dark:shadow-[0_0_30px_rgba(0,0,0,0.5)] min-w-[240px]">
                 <div className="flex items-baseline gap-1 justify-center">
-                  <span className="text-4xl font-bold font-mono text-white text-shadow-glow">
+                  <span className="text-5xl font-bold font-mono text-purple-900 dark:text-white tracking-tighter">
                     {formatKm(distanceKm)}
                   </span>
                 </div>
 
-                <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-purple-500/50 to-transparent my-2" />
+                <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-purple-300 dark:via-purple-500/50 to-transparent my-3" />
 
-                <div className="flex flex-col gap-0.5">
+                <div className="flex flex-col gap-1">
                   {driveMinutes && (
-                    <span className="text-[10px] text-purple-200 uppercase tracking-widest block mb-1">
+                    <span className="text-xs text-purple-600 dark:text-purple-200 uppercase tracking-widest font-semibold block">
                       ~{driveMinutes} mins away
                     </span>
                   )}
                   {lastSyncedTime && (
-                    <span className="text-[9px] text-gray-400 font-mono block">
+                    <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono block">
                        Hearts synced {formatLastSynced(lastSyncedTime)}
                     </span>
                   )}
@@ -525,16 +525,16 @@ export default function DistanceCalculator({
                layout
                initial={{ opacity: 0 }} 
                animate={{ opacity: 1 }}
-               className="w-full max-w-sm flex flex-col items-center gap-4 mb-8"
+               className="w-full max-w-md flex flex-col items-center gap-4 mb-8"
              >
                 {/* Toggle Button */}
                 <button 
                   onClick={() => setShowMap(!showMap)}
-                  className="flex items-center gap-2 px-4 py-2 border border-purple-500/30 rounded-full bg-purple-500/5 hover:bg-purple-500/10 transition-colors group"
+                  className="flex items-center gap-2 px-5 py-2.5 border border-purple-200 dark:border-purple-500/30 rounded-full bg-white/50 dark:bg-purple-500/5 hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-all shadow-sm group"
                 >
-                    <Globe size={14} className="text-purple-400 group-hover:text-purple-300 animate-[spin_10s_linear_infinite]" />
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-purple-300 group-hover:text-purple-200">
-                        {showMap ? "Close Sat-Link" : "Open Sat-Link"}
+                    <Globe size={14} className="text-purple-600 dark:text-purple-400 group-hover:text-purple-700 dark:group-hover:text-purple-300 animate-[spin_10s_linear_infinite]" />
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-purple-700 dark:text-purple-300 group-hover:text-purple-900 dark:group-hover:text-purple-200 font-semibold">
+                        {showMap ? "Close Map View" : "Open Map View"}
                     </span>
                 </button>
 
@@ -543,9 +543,9 @@ export default function DistanceCalculator({
                     {showMap && (
                         <motion.div
                            initial={{ height: 0, opacity: 0, scale: 0.95 }}
-                           animate={{ height: 250, opacity: 1, scale: 1 }}
+                           animate={{ height: 320, opacity: 1, scale: 1 }}
                            exit={{ height: 0, opacity: 0, scale: 0.95 }}
-                           className="w-full rounded-xl overflow-hidden shadow-2xl border border-purple-500/20 relative"
+                           className="w-full rounded-2xl overflow-hidden shadow-2xl border border-gray-100 dark:border-purple-500/20 relative"
                         >
                             <SignalMap 
                                 myLocation={myLocation} 

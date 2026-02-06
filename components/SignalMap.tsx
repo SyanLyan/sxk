@@ -90,28 +90,24 @@ export default function SignalMap({ myLocation, partnerLocation, herAvatar }: Si
   const myIcon = createFallbackIcon("S"); // Hardcoded 'S' based on parent logic
   const herIcon = createAvatarIcon(herAvatar, true);
   
-  // THEME: "Retro Grid"
-  // We use CartoDB Dark Matter tiles + CSS filters to make it purple/cyberpunk.
+  // THEME: "Modern Clean"
+  // Standard OSM tiles, no filters.
 
   return (
-    <div className="w-full h-full relative isolate rounded-xl overflow-hidden border border-purple-500/30 shadow-2xl">
+    <div className="w-full h-full relative isolate rounded-xl overflow-hidden border border-gray-200 dark:border-purple-500/30 shadow-2xl bg-gray-50 dark:bg-gray-900">
         
-       {/* Scanline Overlay */}
-       <div className="absolute inset-0 z-[401] pointer-events-none bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
-       <div className="absolute inset-0 z-[401] pointer-events-none bg-gradient-to-b from-transparent via-purple-500/5 to-transparent" />
-
        <MapContainer 
          center={defaultCenter} 
          zoom={4} 
          scrollWheelZoom={true} 
-         className="w-full h-full z-0 bg-[#050505]"
+         className="w-full h-full z-0"
          zoomControl={false} 
          attributionControl={false}
        >
-         {/* BASE LAYER - Standard OSM with Invert Filter (High contrast retro look) */}
+         {/* BASE LAYER - Standard OSM */}
          <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            className="map-tiles-retro" 
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
          />
 
          {/* YOU */}
@@ -132,10 +128,9 @@ export default function SignalMap({ myLocation, partnerLocation, herAvatar }: Si
                    [partnerLocation.lat, partnerLocation.lng]
                ]} 
                pathOptions={{ 
-                   color: '#c084fc', // purple-400
-                   weight: 3, 
-                   dashArray: '10, 15', 
-                   opacity: 0.6,
+                   color: '#a855f7', // purple-500
+                   weight: 4, 
+                   opacity: 0.8,
                    lineCap: 'round'
                }} 
              />
@@ -143,16 +138,6 @@ export default function SignalMap({ myLocation, partnerLocation, herAvatar }: Si
 
          <AutoFitBounds points={points} myLocation={myLocation} />
        </MapContainer>
-
-       {/* INJECT CSS FILTERS FOR TILES */}
-       <style jsx global>{`
-         .map-tiles-retro {
-            filter: invert(1) grayscale(1) brightness(0.6) sepia(1) hue-rotate(220deg) saturate(3) contrast(1.2) !important;
-         }
-         .leaflet-container {
-            background: #050505 !important;
-         }
-       `}</style>
     </div>
   );
 }
