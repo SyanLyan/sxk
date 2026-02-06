@@ -432,7 +432,7 @@ export default function DistanceCalculator({
           </div>
 
           {/* LEFT: YOU */}
-          <div className="relative flex flex-col items-center gap-4 group cursor-default">
+          <div className="relative flex flex-col items-center gap-4 group cursor-default z-10">
             <motion.div
               whileHover={{ scale: 1.1 }}
               className="w-16 h-16 rounded-full border border-gray-700 bg-background/50 backdrop-blur-md flex items-center justify-center relative shadow-2xl z-10"
@@ -454,36 +454,8 @@ export default function DistanceCalculator({
             </span>
           </div>
 
-          {/* DISTANCE (Floating in middle if active) */}
-          <AnimatePresence>
-            {distanceKm !== null && (
-              <motion.div
-                initial={{ y: 20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: 20, opacity: 0 }}
-                className="absolute left-1/2 -translate-x-1/2 -top-12 bg-black/50 border border-purple-500/30 backdrop-blur-md px-4 py-2 rounded text-center z-20 min-w-[200px]"
-              >
-                <span className="block text-2xl font-bold font-mono text-white text-shadow-glow">
-                  {formatKm(distanceKm)}
-                </span>
-                <div className="flex flex-col gap-0.5">
-                  {driveMinutes && (
-                    <span className="text-[9px] text-gray-400 uppercase tracking-wider block">
-                      ~{driveMinutes} mins away
-                    </span>
-                  )}
-                  {lastSyncedTime && (
-                    <span className="text-[9px] text-purple-300 font-mono tracking-wider block animate-pulse">
-                      Hearts synced {formatLastSynced(lastSyncedTime)}
-                    </span>
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
           {/* RIGHT: HER */}
-          <div className="relative flex flex-col items-center gap-4 group cursor-default">
+          <div className="relative flex flex-col items-center gap-4 group cursor-default z-10">
             <motion.div
               whileHover={{ scale: 1.1 }}
               className={cn(
@@ -505,6 +477,41 @@ export default function DistanceCalculator({
           </div>
         </div>
 
+        {/* DISTANCE (Moved below avatars) */}
+        <AnimatePresence>
+          {distanceKm !== null && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mb-12 flex flex-col items-center"
+            >
+              <div className="bg-black/60 border border-purple-500/30 backdrop-blur-md px-8 py-4 rounded-xl text-center shadow-[0_0_30px_rgba(0,0,0,0.5)] min-w-[220px]">
+                <div className="flex items-baseline gap-1 justify-center">
+                  <span className="text-4xl font-bold font-mono text-white text-shadow-glow">
+                    {formatKm(distanceKm)}
+                  </span>
+                </div>
+
+                <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-purple-500/50 to-transparent my-2" />
+
+                <div className="flex flex-col gap-0.5">
+                  {driveMinutes && (
+                    <span className="text-[10px] text-purple-200 uppercase tracking-widest block mb-1">
+                      ~{driveMinutes} mins away
+                    </span>
+                  )}
+                  {lastSyncedTime && (
+                    <span className="text-[9px] text-gray-400 font-mono block">
+                       Hearts synced {formatLastSynced(lastSyncedTime)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* ERROR MESSAGE */}
         {error && (
           <p className="text-red-400 text-xs font-mono mb-6 bg-red-900/20 px-3 py-1 rounded border border-red-900/30">
@@ -513,7 +520,7 @@ export default function DistanceCalculator({
         )}
 
         {/* Control Actions */}
-        <div className="flex flex-col md:flex-row items-center justify-center gap-6 mt-8 mb-20">
+        <div className="flex flex-col md:flex-row items-center justify-center gap-6 mt-8">
           {isLinkSession && (
             <button
               onClick={shareLocation}
@@ -580,7 +587,7 @@ export default function DistanceCalculator({
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="mt-12 text-center"
+            className="mt-12 text-center mb-20"
           >
             <div className="inline-flex items-center gap-2 text-gray-500 text-[10px] font-mono uppercase tracking-widest border border-gray-800 px-3 py-1 rounded-full">
               <Navigation
