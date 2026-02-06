@@ -520,7 +520,7 @@ export default function DistanceCalculator({
         )}
 
         {/* Control Actions */}
-        <div className="flex flex-col md:flex-row items-center justify-center gap-6 mt-8">
+        <div className="flex flex-col md:flex-row items-center justify-center gap-6 mt-8 mb-10">
           {isLinkSession && (
             <button
               onClick={shareLocation}
