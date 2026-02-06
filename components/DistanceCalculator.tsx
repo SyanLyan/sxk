@@ -72,19 +72,13 @@ type LocationPoint = {
   updatedAt?: string;
 };
 
-type RequestRow = {
-  id: string;
-  requester_id: string;
-  requester_label: string | null;
-  created_at: string;
-};
-
 type SyncedRow = {
   session_code: string;
   requester_lat: number | null;
   requester_lng: number | null;
   partner_lat: number | null;
   partner_lng: number | null;
+  is_synced: boolean | null;
 };
 
 type DistanceCalculatorProps = {
@@ -102,7 +96,7 @@ export default function DistanceCalculator({
   const [loading, setLoading] = useState(false);
   const [requesting, setRequesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pendingRequest, setPendingRequest] = useState<RequestRow | null>(null);
+  const [isSynced, setIsSynced] = useState(false); // DB flag
   const [clientId, setClientId] = useState<string | null>(null);
   const [activeSessionCode, setActiveSessionCode] = useState<string | null>(
     sessionCode ?? null,
@@ -110,7 +104,6 @@ export default function DistanceCalculator({
   const [sessionOrigin, setSessionOrigin] = useState<"local" | "link" | null>(
     null,
   );
-  const [hasRequested, setHasRequested] = useState(false);
   const CALC_DELAY_MS = 800;
 
   // ...existing code...
@@ -177,6 +170,10 @@ export default function DistanceCalculator({
 
     const applySyncedRow = (row: SyncedRow | null) => {
       if (!row) return;
+      
+      const synced = row.is_synced === true;
+      setIsSynced(synced);
+
       const requesterPoint =
         row.requester_lat !== null && row.requester_lng !== null
           ? { lat: row.requester_lat, lng: row.requester_lng }
@@ -185,23 +182,26 @@ export default function DistanceCalculator({
         row.partner_lat !== null && row.partner_lng !== null
           ? { lat: row.partner_lat, lng: row.partner_lng }
           : null;
+      
       const isLink = sessionOrigin === "link";
       setMyLocation(isLink ? partnerPoint : requesterPoint);
       setPartnerLocation(isLink ? requesterPoint : partnerPoint);
     };
 
-    const fetchInitial = async () => {
+    const fetchSyncedData = async () => {
       const { data } = await supabase
         .from("synced_locations")
-        .select("session_code, requester_lat, requester_lng, partner_lat, partner_lng")
+        .select("session_code, requester_lat, requester_lng, partner_lat, partner_lng, is_synced")
         .eq("session_code", activeSessionCode)
         .maybeSingle();
 
       applySyncedRow(data ?? null);
     };
 
-    fetchInitial();
+    // Initial fetch
+    fetchSyncedData();
 
+    // Realtime subscription
     const locationChannel = supabase
       .channel(`synced-locations-${activeSessionCode}`)
       .on(
@@ -219,28 +219,14 @@ export default function DistanceCalculator({
       )
       .subscribe();
 
-    const requestChannel = supabase
-      .channel(`pair-requests-${activeSessionCode}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "pair_requests",
-          filter: `session_code=eq.${activeSessionCode}`,
-        },
-        (payload) => {
-          const row = payload.new as RequestRow;
-          if (row.requester_id !== clientId) {
-            setPendingRequest(row);
-          }
-        },
-      )
-      .subscribe();
+    // 3s interval polling as requested
+    const intervalId = setInterval(() => {
+      fetchSyncedData();
+    }, 3000);
 
     return () => {
       supabase.removeChannel(locationChannel);
-      supabase.removeChannel(requestChannel);
+      clearInterval(intervalId);
     };
   }, [clientId, activeSessionCode, supabase, sessionOrigin]);
 
@@ -255,30 +241,9 @@ export default function DistanceCalculator({
     setDistanceKm(dist);
   }, [myLocation, partnerLocation]);
 
-  useEffect(() => {
-    if (!hasRequested) return;
-    if (!partnerLocation) return;
-    if (!activeSessionCode || !supabase || !clientId) return;
 
-    const clearRequest = async () => {
-      await supabase
-        .from("pair_requests")
-        .delete()
-        .eq("session_code", activeSessionCode)
-        .eq("requester_id", clientId);
-      setHasRequested(false);
-    };
 
-    clearRequest();
-  }, [
-    hasRequested,
-    partnerLocation,
-    activeSessionCode,
-    supabase,
-    clientId,
-  ]);
-
-  const syncLocation = async (): Promise<void> => {
+  const syncLocation = async (setSyncedStatus?: boolean): Promise<void> => {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
         reject(new Error("Geolocation not supported"));
@@ -294,7 +259,7 @@ export default function DistanceCalculator({
           setMyLocation({ lat: currentLat, lng: currentLng });
 
           if (activeSessionCode && supabase && clientId) {
-            const payload = isLink
+            const payload: any = isLink
               ? {
                   session_code: activeSessionCode,
                   partner_lat: currentLat,
@@ -305,6 +270,10 @@ export default function DistanceCalculator({
                   requester_lat: currentLat,
                   requester_lng: currentLng,
                 };
+
+            if (typeof setSyncedStatus === "boolean") {
+              payload.is_synced = setSyncedStatus;
+            }
 
             const { error: upsertError } = await supabase
               .from("synced_locations")
@@ -337,7 +306,9 @@ export default function DistanceCalculator({
     setLoading(true);
 
     try {
-      await syncLocation();
+      // Sync as requester, set is_synced = false
+      await syncLocation(false);
+      
       const origin =
         typeof window !== "undefined" ? window.location.origin : "";
       const entryUrl = origin
@@ -352,21 +323,9 @@ export default function DistanceCalculator({
       });
 
       if (!res.ok) {
-        const errText = await res.text();
         throw new Error("Telegram API failed");
       }
-
-      // 3. Create a request record to trigger UI on their active screen (if open)
-      const { error: reqError } = await supabase.from("pair_requests").insert({
-        session_code: activeSessionCode,
-        requester_id: clientId,
-        requester_label: "Partner",
-      });
-
-      if (reqError) {
-        throw reqError;
-      }
-      setHasRequested(true);
+      // No more pair_requests table logic
     } catch (err) {
       setError("Failed to sync and send request");
     } finally {
@@ -380,21 +339,11 @@ export default function DistanceCalculator({
     setError(null);
 
     try {
-      await syncLocation();
-
-      /* Accept any pending request when sharing */
-      if (pendingRequest?.id && supabase) {
-        const { error: delError } = await supabase
-          .from("pair_requests")
-          .delete()
-          .eq("id", pendingRequest.id);
-
-        setPendingRequest(null);
-      }
+      // Sync as partner, set is_synced = true
+      await syncLocation(true);
     } catch (err) {
       setError("Location access denied or failed");
     } finally {
-      // Add a small artificial delay for UX smoothness if it was too fast
       setTimeout(() => setLoading(false), CALC_DELAY_MS);
     }
   };
@@ -435,10 +384,10 @@ export default function DistanceCalculator({
           </h3>
           {!isLinkSession && (
             <p className="text-[10px] font-mono tracking-[0.3em] uppercase text-gray-500">
-              {partnerSynced
-                ? "Partner synced"
-                : hasRequested
-                  ? "Waiting for partner sync"
+              {isSynced
+                ? "Connection Established"
+                : myLocation
+                  ? "Waiting for partner to sync..."
                   : "Send a ping to request sync"}
             </p>
           )}
@@ -526,30 +475,6 @@ export default function DistanceCalculator({
           </div>
         </div>
 
-        {/* PENDING REQUEST ALERT */}
-        <AnimatePresence>
-          {pendingRequest && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="mb-8 w-full max-w-sm"
-            >
-              <div className="bg-purple-900/20 border border-purple-500/40 p-4 rounded text-center">
-                <p className="text-xs text-purple-300 font-mono mb-3 uppercase tracking-wider">
-                  Incoming Signal Request
-                </p>
-                <button
-                  onClick={shareLocation}
-                  className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded uppercase font-bold tracking-widest"
-                >
-                  Accept Link
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {/* ERROR MESSAGE */}
         {error && (
           <p className="text-red-400 text-xs font-mono mb-6 bg-red-900/20 px-3 py-1 rounded border border-red-900/30">
@@ -580,7 +505,11 @@ export default function DistanceCalculator({
                     className="group-hover:-translate-y-1 group-hover:translate-x-1 transition-transform duration-500 text-purple-800 dark:text-purple-200"
                   />
                 )}
-                {loading ? "Scanning..." : "Initiate Scan"}
+                {loading
+                  ? "Scanning..."
+                  : isSynced
+                    ? "Update Location"
+                    : "Initiate Scan"}
               </span>
             </button>
           )}
@@ -588,8 +517,11 @@ export default function DistanceCalculator({
           {!isLinkSession && activeSessionCode && supabase && (
             <button
               onClick={requestLocation}
-              disabled={requesting}
-              className="group relative px-8 py-4 bg-transparent overflow-hidden rounded-none"
+              disabled={requesting || (!!myLocation && !isSynced)}
+              className={cn(
+                "group relative px-8 py-4 bg-transparent overflow-hidden rounded-none transition-opacity",
+                !!myLocation && !isSynced && "opacity-50 cursor-not-allowed",
+              )}
             >
               <div className="absolute inset-0 w-full h-full bg-white/50 dark:bg-white/5 border border-purple-400/50 dark:border-purple-500/20 group-hover:border-purple-500/50 transition-colors" />
 
@@ -601,7 +533,11 @@ export default function DistanceCalculator({
                     requesting && "animate-pulse",
                   )}
                 />
-                {requesting ? "Pinging..." : "Ping Signal"}
+                {requesting
+                  ? "Pinging..."
+                  : !!myLocation && !isSynced
+                    ? "Signal Sent"
+                    : "Ping Signal"}
               </span>
             </button>
           )}
