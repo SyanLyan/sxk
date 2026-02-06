@@ -103,6 +103,7 @@ export default function DistanceCalculator({
   const [sessionOrigin, setSessionOrigin] = useState<"local" | "link" | null>(
     null,
   );
+  const [hasRequested, setHasRequested] = useState(false);
   const CALC_DELAY_MS = 800;
 
   // ...existing code...
@@ -250,6 +251,29 @@ export default function DistanceCalculator({
     setDistanceKm(dist);
   }, [myLocation, partnerLocation]);
 
+  useEffect(() => {
+    if (!hasRequested) return;
+    if (!partnerLocation?.updatedAt) return;
+    if (!activeSessionCode || !supabase || !clientId) return;
+
+    const clearRequest = async () => {
+      await supabase
+        .from("pair_requests")
+        .delete()
+        .eq("session_code", activeSessionCode)
+        .eq("requester_id", clientId);
+      setHasRequested(false);
+    };
+
+    clearRequest();
+  }, [
+    hasRequested,
+    partnerLocation?.updatedAt,
+    activeSessionCode,
+    supabase,
+    clientId,
+  ]);
+
   const syncLocation = async (): Promise<void> => {
     return new Promise(async (resolve, reject) => {
       const currentLat = FIXED_COORDS.lat;
@@ -323,6 +347,7 @@ export default function DistanceCalculator({
       if (reqError) {
         throw reqError;
       }
+      setHasRequested(true);
     } catch (err) {
       setError("Failed to sync and send request");
     } finally {
@@ -370,6 +395,7 @@ export default function DistanceCalculator({
       : 0;
   const direction = bearingToCompass(bearing);
   const isLinkSession = sessionOrigin === "link";
+  const partnerSynced = Boolean(partnerLocation?.updatedAt);
 
   return (
     <section className="min-h-[60vh] w-full flex flex-col items-center justify-center relative py-12 px-4 overflow-hidden">
@@ -388,6 +414,15 @@ export default function DistanceCalculator({
           <h3 className="text-sm md:text-md font-mono tracking-[0.3em] uppercase text-purple-200">
             Signal Link
           </h3>
+          {!isLinkSession && (
+            <p className="text-[10px] font-mono tracking-[0.3em] uppercase text-gray-500">
+              {partnerSynced
+                ? "Partner synced"
+                : hasRequested
+                  ? "Waiting for partner sync"
+                  : "Send a ping to request sync"}
+            </p>
+          )}
         </div>
 
         {/* TWO POINTS LAYOUT */}
