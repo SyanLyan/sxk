@@ -15,7 +15,6 @@ const KM_PER_HOUR_DRIVE = 40;
 const LOCAL_ID_KEY = "sxk-client-id";
 const SESSION_CODE_KEY = "sxk-session-code";
 const SESSION_ORIGIN_KEY = "sxk-session-origin";
-const FIXED_COORDS = { lat: 16.771181, lng: 96.159987 };
 
 // (Keep Helper Functions: calculateDistance, deg2rad, formatKm, getDriveMinutes, getBearing, bearingToCompass unchanged)
 function calculateDistance(
@@ -280,40 +279,51 @@ export default function DistanceCalculator({
   ]);
 
   const syncLocation = async (): Promise<void> => {
-    return new Promise(async (resolve, reject) => {
-      const currentLat = FIXED_COORDS.lat;
-      const currentLng = FIXED_COORDS.lng;
-      const isLink = sessionOrigin === "link";
-
-      setMyLocation({ lat: currentLat, lng: currentLng });
-
-      if (activeSessionCode && supabase && clientId) {
-        const payload = isLink
-          ? {
-              session_code: activeSessionCode,
-              partner_lat: currentLat,
-              partner_lng: currentLng,
-            }
-          : {
-              session_code: activeSessionCode,
-              requester_lat: currentLat,
-              requester_lng: currentLng,
-            };
-
-        const { error: upsertError } = await supabase
-          .from("synced_locations")
-          .upsert(payload, { onConflict: "session_code" });
-
-        if (upsertError) {
-          reject(upsertError);
-        } else {
-          resolve();
-        }
-      } else if (!activeSessionCode) {
-        resolve();
-      } else {
-        resolve();
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error("Geolocation not supported"));
+        return;
       }
+
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const currentLat = position.coords.latitude;
+          const currentLng = position.coords.longitude;
+          const isLink = sessionOrigin === "link";
+
+          setMyLocation({ lat: currentLat, lng: currentLng });
+
+          if (activeSessionCode && supabase && clientId) {
+            const payload = isLink
+              ? {
+                  session_code: activeSessionCode,
+                  partner_lat: currentLat,
+                  partner_lng: currentLng,
+                }
+              : {
+                  session_code: activeSessionCode,
+                  requester_lat: currentLat,
+                  requester_lng: currentLng,
+                };
+
+            const { error: upsertError } = await supabase
+              .from("synced_locations")
+              .upsert(payload, { onConflict: "session_code" });
+
+            if (upsertError) {
+              reject(upsertError);
+            } else {
+              resolve();
+            }
+          } else {
+            resolve();
+          }
+        },
+        (err) => {
+          reject(err);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+      );
     });
   };
 
