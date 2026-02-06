@@ -37,14 +37,29 @@ const createFallbackIcon = (initial: string) => {
 }
 
 // --- AUTO FIT BOUNDS COMPONENT ---
-function AutoFitBounds({ points }: { points: [number, number][] }) {
+function AutoFitBounds({ points, myLocation }: { points: [number, number][], myLocation: Location | null }) {
   const map = useMap();
 
   useEffect(() => {
-    if (points.length === 0) return;
-    const bounds = L.latLngBounds(points);
-    map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15, animate: true, duration: 1.5 });
-  }, [points, map]);
+    // Fix for Leaflet rendering in a resizing container (Framer Motion)
+    const resizeObserver = new ResizeObserver(() => {
+        map.invalidateSize();
+    });
+    resizeObserver.observe(map.getContainer());
+    
+    // Slight delay to ensure container has size before fitting
+    setTimeout(() => {
+        map.invalidateSize();
+        if (points.length > 1) {
+            const bounds = L.latLngBounds(points);
+            map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14, animate: true, duration: 1.5 });
+        } else if (myLocation) {
+             map.flyTo([myLocation.lat, myLocation.lng], 13, { animate: true, duration: 1.5 });
+        }
+    }, 100);
+
+    return () => resizeObserver.disconnect();
+  }, [points, map, myLocation]);
 
   return null;
 }
@@ -86,17 +101,17 @@ export default function SignalMap({ myLocation, partnerLocation, herAvatar }: Si
        <div className="absolute inset-0 z-[401] pointer-events-none bg-gradient-to-b from-transparent via-purple-500/5 to-transparent" />
 
        <MapContainer 
-         center={points[0] || defaultCenter} 
-         zoom={2} 
-         scrollWheelZoom={false} // Keep it static-ish for "mini map" feel unless interacted
-         className="w-full h-full z-0 bg-[#1a1a1a]"
-         zoomControl={false} // Clean retro look
+         center={defaultCenter} 
+         zoom={4} 
+         scrollWheelZoom={true} 
+         className="w-full h-full z-0 bg-[#050505]"
+         zoomControl={false} 
          attributionControl={false}
        >
-         {/* BASE LAYER - Dark Matter */}
+         {/* BASE LAYER - Standard OSM with Invert Filter (High contrast retro look) */}
          <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            className="map-tiles-retro" // We will inject CSS to style this class
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            className="map-tiles-retro" 
          />
 
          {/* YOU */}
@@ -117,21 +132,22 @@ export default function SignalMap({ myLocation, partnerLocation, herAvatar }: Si
                    [partnerLocation.lat, partnerLocation.lng]
                ]} 
                pathOptions={{ 
-                   color: '#a855f7', // purple-500
-                   weight: 2, 
-                   dashArray: '5, 10', 
-                   opacity: 0.8 
+                   color: '#c084fc', // purple-400
+                   weight: 3, 
+                   dashArray: '10, 15', 
+                   opacity: 0.6,
+                   lineCap: 'round'
                }} 
              />
          )}
 
-         <AutoFitBounds points={points} />
+         <AutoFitBounds points={points} myLocation={myLocation} />
        </MapContainer>
 
        {/* INJECT CSS FILTERS FOR TILES */}
        <style jsx global>{`
          .map-tiles-retro {
-            filter: contrast(1.1) brightness(0.8) sepia(1) hue-rotate(240deg) saturate(1.2) !important;
+            filter: invert(1) grayscale(1) brightness(0.6) sepia(1) hue-rotate(220deg) saturate(3) contrast(1.2) !important;
          }
          .leaflet-container {
             background: #050505 !important;
