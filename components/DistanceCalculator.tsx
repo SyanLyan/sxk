@@ -1,10 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
-import { Navigation, Send, User, Radar, Heart, MapPin } from "lucide-react";
+import { Navigation, Send, User, Radar, Heart, MapPin, Globe, Map as MapIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createBrowserSupabaseClient } from "@/lib/supabaseClient";
+
+const SignalMap = dynamic(() => import("./SignalMap"), { 
+  ssr: false,
+  loading: () => <div className="w-full h-full bg-purple-900/10 animate-pulse flex items-center justify-center text-purple-500/30 font-mono text-xs">INITIALIZING SAT-LINK...</div>
+});
 
 // ...existing code...
 // (Keep CONSTANTS: HER_AVATAR, MY_AVATAR_FALLBACK, etc. unchanged)
@@ -99,6 +105,7 @@ export default function DistanceCalculator({
   const [requesting, setRequesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSynced, setIsSynced] = useState(false); // DB flag
+  const [showMap, setShowMap] = useState(false);
   const [lastSyncedTime, setLastSyncedTime] = useState<string | null>(null);
   const [clientId, setClientId] = useState<string | null>(null);
   const [activeSessionCode, setActiveSessionCode] = useState<string | null>(
@@ -450,7 +457,7 @@ export default function DistanceCalculator({
               )}
             </motion.div>
             <span className="text-[10px] font-mono tracking-widest text-gray-500 uppercase">
-              Your Location
+              Sai
             </span>
           </div>
 
@@ -472,7 +479,7 @@ export default function DistanceCalculator({
               />
             </motion.div>
             <span className="text-[10px] font-mono tracking-widest text-gray-500 uppercase">
-              Her Heart
+              Kuu
             </span>
           </div>
         </div>
@@ -511,7 +518,46 @@ export default function DistanceCalculator({
             </motion.div>
           )}
         </AnimatePresence>
+        {/* --- MINI MAP TOGGLE & VIEW --- */}
+        <AnimatePresence>
+          {(myLocation || partnerLocation) && (
+             <motion.div 
+               layout
+               initial={{ opacity: 0 }} 
+               animate={{ opacity: 1 }}
+               className="w-full max-w-sm flex flex-col items-center gap-4 mb-8"
+             >
+                {/* Toggle Button */}
+                <button 
+                  onClick={() => setShowMap(!showMap)}
+                  className="flex items-center gap-2 px-4 py-2 border border-purple-500/30 rounded-full bg-purple-500/5 hover:bg-purple-500/10 transition-colors group"
+                >
+                    <Globe size={14} className="text-purple-400 group-hover:text-purple-300 animate-[spin_10s_linear_infinite]" />
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-purple-300 group-hover:text-purple-200">
+                        {showMap ? "Close Sat-Link" : "Open Sat-Link"}
+                    </span>
+                </button>
 
+                {/* The Map */}
+                <AnimatePresence>
+                    {showMap && (
+                        <motion.div
+                           initial={{ height: 0, opacity: 0, scale: 0.95 }}
+                           animate={{ height: 250, opacity: 1, scale: 1 }}
+                           exit={{ height: 0, opacity: 0, scale: 0.95 }}
+                           className="w-full rounded-xl overflow-hidden shadow-2xl border border-purple-500/20 relative"
+                        >
+                            <SignalMap 
+                                myLocation={myLocation} 
+                                partnerLocation={partnerLocation} 
+                                herAvatar={HER_AVATAR} 
+                            />
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+             </motion.div>
+          )}
+        </AnimatePresence>
         {/* ERROR MESSAGE */}
         {error && (
           <p className="text-red-400 text-xs font-mono mb-6 bg-red-900/20 px-3 py-1 rounded border border-red-900/30">
