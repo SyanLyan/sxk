@@ -18,12 +18,6 @@ import { createBrowserSupabaseClient } from "@/lib/supabaseClient";
 const HER_AVATAR = "/Her/img/casual/1000009032.jpeg";
 const MY_AVATAR_FALLBACK = "S"; 
 
-const HER_LOCATION = {
-  lat: 16.789663,
-  lng: 96.191354,
-  name: "Her",
-};
-
 const KM_PER_HOUR_DRIVE = 40;
 const LOCAL_ID_KEY = "sxk-client-id";
 
@@ -105,12 +99,6 @@ export default function DistanceCalculator({ sessionCode }: DistanceCalculatorPr
   const supabase = useMemo(() => {
         if (!sessionCode) return null;
         return createBrowserSupabaseClient();
-      }, [sessionCode]);
-    
-      useEffect(() => {
-        if (!sessionCode) {
-          setPartnerLocation({ lat: HER_LOCATION.lat, lng: HER_LOCATION.lng });
-        }
       }, [sessionCode]);
     
       useEffect(() => {
@@ -209,19 +197,25 @@ export default function DistanceCalculator({ sessionCode }: DistanceCalculatorPr
       }, [myLocation, partnerLocation]);
 
   const syncLocation = async (): Promise<void> => {
+    console.log("📍 Starting syncLocation...");
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
+        console.error("❌ Geolocation not supported by browser");
         reject(new Error("Geolocation not supported"));
         return;
       }
 
+      console.log("📡 Requesting browser position...");
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const currentLat = position.coords.latitude;
           const currentLng = position.coords.longitude;
+          console.log("✅ Position received:", currentLat, currentLng);
+          
           setMyLocation({ lat: currentLat, lng: currentLng });
 
           if (sessionCode && supabase && clientId) {
+            console.log("💾 Upserting to Supabase...", { sessionCode, clientId });
             const { error: upsertError } = await supabase
               .from("pair_locations")
               .upsert(
@@ -232,20 +226,26 @@ export default function DistanceCalculator({ sessionCode }: DistanceCalculatorPr
                   lng: currentLng,
                   updated_at: new Date().toISOString(),
                 },
-                { onConflict: "session_code,client_id" },
+                { onConflict: "session_code,client_id" }
               );
 
             if (upsertError) {
+              console.error("❌ Supabase Upsert Error:", upsertError);
               reject(upsertError);
             } else {
+              console.log("✅ Supabase Upsert Success");
               resolve();
             }
           } else if (!sessionCode) {
-             // Allow offline/demo use
+             console.log("⚠️ No sessionCode provided, skipping Supabase upload.");
+             resolve();
+          } else {
+             console.warn("⚠️ Supabase client or clientId missing", { supabase: !!supabase, clientId });
              resolve();
           }
         },
         (err) => {
+          console.error("❌ Geolocation Error:", err);
           reject(err);
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
@@ -254,39 +254,59 @@ export default function DistanceCalculator({ sessionCode }: DistanceCalculatorPr
   };
 
   const requestLocation = async () => {
-    if (!sessionCode || !supabase || !clientId) return;
+    console.log("🚀 Starting requestLocation...");
+    if (!sessionCode || !supabase || !clientId) {
+        console.error("❌ Missing requirements:", { sessionCode, supabase: !!supabase, clientId });
+        return;
+    }
 
     setRequesting(true);
     setError(null);
-    
-    // Also set loading state for visual feedback on the map icon
     setLoading(true);
 
     try {
       // 1. Sync my location first so it's ready when they open the link
+      console.log("1️⃣ Syncing own location first...");
       await syncLocation();
 
       // 2. Send the Telegram Notification
+      console.log("2️⃣ Sending Telegram notification...");
       const origin = typeof window !== "undefined" ? window.location.origin : "";
       const entryUrl = origin
         ? `${origin}/entry/${sessionCode}`
         : `/entry/${sessionCode}`;
       const message = `📍 Signal Request.\nPartner is waiting at: ${entryUrl}`;
 
-      await fetch("/api/notify", {
+      const res = await fetch("/api/notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message }),
       });
+      
+      if (!res.ok) {
+          const errText = await res.text();
+          console.error("❌ Telegram API Error:", res.status, errText);
+          throw new Error("Telegram API failed");
+      } else {
+          console.log("✅ Telegram Notification Sent");
+      }
 
       // 3. Create a request record to trigger UI on their active screen (if open)
-      await supabase.from("pair_requests").insert({
+      console.log("3️⃣ Creating Supabase request...");
+      const { error: reqError } = await supabase.from("pair_requests").insert({
         session_code: sessionCode,
         requester_id: clientId,
         requester_label: "Partner",
       });
+
+      if (reqError) {
+          console.error("❌ Supabase Request Insert Error:", reqError);
+          throw reqError;
+      } else {
+          console.log("✅ Supabase Request Created");
+      }
     } catch (err) {
-      console.error(err);
+      console.error("❌ General Request Flow Error:", err);
       setError("Failed to sync and send request");
     } finally {
       setRequesting(false);
@@ -295,6 +315,7 @@ export default function DistanceCalculator({ sessionCode }: DistanceCalculatorPr
   };
 
   const shareLocation = async () => {
+    console.log("📍 Share Location Button Clicked");
     setLoading(true);
     setError(null);
 
@@ -303,14 +324,19 @@ export default function DistanceCalculator({ sessionCode }: DistanceCalculatorPr
 
       /* Accept any pending request when sharing */
       if (pendingRequest?.id && supabase) {
-        await supabase
+        console.log("🧹 Clearing pending request...", pendingRequest.id);
+        const { error: delError } = await supabase
           .from("pair_requests")
           .delete()
           .eq("id", pendingRequest.id);
+        
+        if(delError) console.error("❌ Error deleting request:", delError);
+        else console.log("✅ Pending request cleared");
+
         setPendingRequest(null);
       }
     } catch (err) {
-      console.error(err);
+      console.error("❌ Share Location Flow Error:", err);
       setError("Location access denied or failed");
     } finally {
       // Add a small artificial delay for UX smoothness if it was too fast
