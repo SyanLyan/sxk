@@ -50,6 +50,40 @@ body {
   z-index: -1;
 }
 
+.retro-grid::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(90deg, rgba(255, 80, 80, 0.06), rgba(80, 255, 180, 0.05), rgba(120, 120, 255, 0.06)),
+    linear-gradient(0deg, rgba(255, 80, 80, 0.04), rgba(80, 255, 180, 0.03), rgba(120, 120, 255, 0.04));
+  mix-blend-mode: screen;
+  opacity: 0.2;
+  animation: retro-grid-breathe 8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes retro-grid-breathe {
+  0% {
+    opacity: 0.12;
+    filter: hue-rotate(0deg) saturate(1.1);
+  }
+  50% {
+    opacity: 0.28;
+    filter: hue-rotate(35deg) saturate(1.35);
+  }
+  100% {
+    opacity: 0.12;
+    filter: hue-rotate(0deg) saturate(1.1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .retro-grid::after {
+    animation: none;
+  }
+}
+
 .dark .retro-grid {
   /* Inherits var(--grid-color) */
 }

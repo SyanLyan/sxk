@@ -14,7 +14,8 @@ const SignalMap = dynamic(() => import("./SignalMap"), {
 
 // ...existing code...
 // (Keep CONSTANTS: HER_AVATAR, MY_AVATAR_FALLBACK, etc. unchanged)
-const HER_AVATAR = "/Her/img/casual/1000009032.jpeg";
+const HER_AVATAR = "/Avatar/kuu.jpeg";
+const MY_AVATAR = "/Avatar/sai.jpg";
 const MY_AVATAR_FALLBACK = "S";
 
 const KM_PER_HOUR_DRIVE = 40;
@@ -442,17 +443,15 @@ export default function DistanceCalculator({
           <div className="relative flex flex-col items-center gap-4 group cursor-default z-10">
             <motion.div
               whileHover={{ scale: 1.1 }}
-              className="w-16 h-16 rounded-full border border-gray-700 bg-background/50 backdrop-blur-md flex items-center justify-center relative shadow-2xl z-10"
+              className="w-16 h-16 rounded-full border border-gray-700 bg-background/50 backdrop-blur-md flex items-center justify-center relative shadow-2xl z-10 overflow-hidden"
             >
               {loading ? (
                 <div className="absolute inset-0 rounded-full border-2 border-t-purple-500 border-r-transparent animate-spin" />
               ) : (
-                <MapPin
-                  size={20}
-                  className={cn(
-                    "text-gray-400 group-hover:text-purple-400 transition-colors",
-                    distanceKm !== null && "text-purple-500",
-                  )}
+                <img
+                  src={MY_AVATAR}
+                  alt="Sai"
+                  className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
                 />
               )}
             </motion.div>
@@ -548,9 +547,10 @@ export default function DistanceCalculator({
                            className="w-full rounded-2xl overflow-hidden shadow-2xl border border-gray-100 dark:border-purple-500/20 relative"
                         >
                             <SignalMap 
-                                myLocation={myLocation} 
-                                partnerLocation={partnerLocation} 
-                                herAvatar={HER_AVATAR} 
+                              myLocation={myLocation} 
+                              partnerLocation={partnerLocation} 
+                              myAvatar={MY_AVATAR}
+                              herAvatar={HER_AVATAR} 
                             />
                         </motion.div>
                     )}

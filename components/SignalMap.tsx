@@ -72,10 +72,11 @@ type Location = {
 type SignalMapProps = {
   myLocation: Location | null;
   partnerLocation: Location | null;
+  myAvatar: string;
   herAvatar: string;
 };
 
-export default function SignalMap({ myLocation, partnerLocation, herAvatar }: SignalMapProps) {
+export default function SignalMap({ myLocation, partnerLocation, myAvatar, herAvatar }: SignalMapProps) {
   // Center default (somewhere neutral or 0,0)
   const defaultCenter: [number, number] = [20, 0];
   
@@ -87,8 +88,8 @@ export default function SignalMap({ myLocation, partnerLocation, herAvatar }: Si
   // If no location, don't render map or render placeholder? 
   // We'll render map but centered globally if empty
   
-  const myIcon = createFallbackIcon("S"); // Hardcoded 'S' based on parent logic
-  const herIcon = createAvatarIcon(herAvatar, true);
+  const myIcon = myAvatar ? createAvatarIcon(myAvatar, false) : createFallbackIcon("S");
+  const herIcon = herAvatar ? createAvatarIcon(herAvatar, true) : createFallbackIcon("K");
   
   // THEME: "Modern Clean"
   // Standard OSM tiles, no filters.
