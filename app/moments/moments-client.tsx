@@ -17,7 +17,7 @@ import {
   ChevronRight,
   ChevronLeft,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 // Helper to check for video files
@@ -93,6 +93,18 @@ export default function MomentsClient({ moments, collections }: { moments: Momen
   const prevSlide = () =>
     setActiveIndex((prev) => (prev - 1 + moments.length) % moments.length);
 
+  useEffect(() => {
+    if (moments.length < 2 || selectedId || selectedCollection) {
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      setActiveIndex((prev) => (prev + 1) % moments.length);
+    }, 5000);
+
+    return () => clearInterval(intervalId);
+  }, [moments.length, selectedId, selectedCollection]);
+
   return (
     <div className="min-h-screen w-full pt-16 pb-12 px-4 md:px-12 relative z-10 flex flex-col items-center">
       <div className="w-full max-w-7xl mx-auto md:min-h-screen flex flex-col justify-start md:justify-center">
@@ -132,7 +144,12 @@ export default function MomentsClient({ moments, collections }: { moments: Momen
         </div>
 
         {/* Desktop Triptych View */}
-        <div className="hidden md:flex items-center justify-center gap-6 lg:gap-12 h-[600px] perspective-[1000px]">
+        <motion.div
+          className="hidden md:flex items-center justify-center gap-6 lg:gap-12 h-[600px] perspective-[1000px]"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+        >
           {/* Left Column (Previous) */}
           {getMoment(-1) && (
             <MomentCard
@@ -181,10 +198,15 @@ export default function MomentsClient({ moments, collections }: { moments: Momen
               className="w-1/4 h-[350px] translate-y-12 opacity-60 hover:opacity-100 transition-opacity"
             />
           )}
-        </div>
+        </motion.div>
 
         {/* Mobile/Tablet Grid View (Fallback) */}
-        <div className="md:hidden grid grid-cols-1 gap-8">
+        <motion.div
+          className="md:hidden grid grid-cols-1 gap-8"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, ease: "easeOut" }}
+        >
           {moments.map((moment) => {
             return (
               <MomentCard
@@ -196,7 +218,7 @@ export default function MomentsClient({ moments, collections }: { moments: Momen
               />
             );
           })}
-        </div>
+        </motion.div>
         </div>
 
         {/* Collections Section */}
@@ -444,7 +466,14 @@ function MomentCard({
   };
 
   return (
-    <div className={cn("relative group", className)} onClick={onClick}>
+    <motion.div
+      className={cn("relative group", className)}
+      onClick={onClick}
+      layout
+      initial={{ opacity: 0, y: 18, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: "spring", stiffness: 220, damping: 24 }}
+    >
       <motion.div
         layoutId={layoutId}
         className="w-full h-full relative"
@@ -528,6 +557,6 @@ function MomentCard({
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-purple-500/5 to-transparent bg-[length:100%_4px] opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-10 mix-blend-color-dodge" />
         </motion.div>
       </motion.div>
-    </div>
+    </motion.div>
   );
 }
