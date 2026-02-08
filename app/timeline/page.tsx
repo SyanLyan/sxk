@@ -31,6 +31,15 @@ const mockEvents: TimelineEvent[] = [
   },
   {
     year: "2026",
+    title: "79th Shan National Day Together",
+    date: "February 7, 2026",
+    location: "Shan National Day Festival",
+    description: "We visited the 79th Shan National Day festival together, sharing the music, the colors, and the pride of the day. It felt special to celebrate side by side and make new memories in the crowd.",
+    tags: ["Festival", "Together"],
+    image: withBasePath("/Timeline/img/1000012654.jpeg")
+  },
+  {
+    year: "2026",
     title: "Building Forever",
     date: "Today",
     location: "The Future",
